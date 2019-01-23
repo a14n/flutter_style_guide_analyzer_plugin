@@ -1,0 +1,8 @@
+name: flutter_style_guide_analyzer_plugin_loader
+version: 0.0.0
+description: Self-loader of the plugin.
+environment:
+  sdk: '>=2.0.0 < 3.0.0'
+dev_dependencies:
+  flutter_style_guide_analyzer_plugin:
+    path: /home/aar-dw/perso/dev/dart/a14n/flutter_style_guide_analyzer_plugin

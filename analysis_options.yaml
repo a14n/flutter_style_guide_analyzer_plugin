@@ -1,0 +1,3 @@
+analyzer:
+  errors:
+    implementation_imports: ignore
