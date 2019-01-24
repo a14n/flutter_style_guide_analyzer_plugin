@@ -50,7 +50,8 @@ class Checker {
     final rules = [
       //EOFRule(addError),
       //SemiColonAtEolRule(addError),
-      IndentRule3(addError),
+      //IndentRule3(addError),
+      StyleRule(addError),
     ];
     for (final rule in rules) {
       rule.visitCompilationUnit(unit);
