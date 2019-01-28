@@ -4,32 +4,11 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 
-class StyleRule extends Rule {
+class StyleRule extends Rule with GeneralizingAstVisitor<void> {
   StyleRule(ErrorReporter addError) : super('style', addError);
 
   LineInfo lineInfo;
-
-  @override
-  void visitCompilationUnit(CompilationUnit node) {
-    lineInfo = node.lineInfo;
-    final styleVisitor = _StyleVisitor(0, this);
-    styleVisitor.visitNode(node);
-  }
-}
-
-class _StyleVisitor extends GeneralizingAstVisitor<void> {
-  _StyleVisitor(
-    this.indentation,
-    this.rule,
-  );
-
-  final int indentation;
-  final StyleRule rule;
-
-  int get expectedColumn => 1 + indentation;
-
-  _StyleVisitor _indent([int padding = 2]) =>
-      _StyleVisitor(indentation + padding, rule);
+  final List<int> indentations = [1];
 
   @override
   void visitAnnotation(Annotation node) {
@@ -37,15 +16,60 @@ class _StyleVisitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
-  void visitClassDeclaration(ClassDeclaration node) {
-    super.visitClassDeclaration(node);
-    _checkIndentation(node.firstTokenAfterCommentAndMetadata.offset);
+  void visitArgumentList(ArgumentList node) {
+    if (node.arguments.isEmpty) {
+      return;
+    }
+    Token previousToken = node.leftParenthesis;
+    for (var expression in node.arguments) {
+      if (_areOnSameLine(expression.offset, node.leftParenthesis.offset)) {
+        expression.accept(this);
+      } else {
+        _indent(() {
+          if (_lineAt(expression.offset) != _lineAt(previousToken.end)) {
+            _checkIndentation(expression.offset);
+          }
+          expression.accept(this);
+        });
+      }
+      previousToken = expression.endToken;
+    }
   }
 
   @override
-  void visitClassMember(ClassMember node) {
-    super.visitClassMember(node);
-    _checkIndentation(node.firstTokenAfterCommentAndMetadata.offset);
+  void visitBlock(Block node) {
+    if (_startsLine(node)) {
+      _checkIndentation(node.offset);
+    }
+    _checkCommentsAndAnnotations(node);
+    if (_isOneLiner(node)) {
+      for (final statement in node.statements) {
+        statement.accept(this);
+      }
+    } else {
+      _indent(() {
+        for (final statement in node.statements) {
+          statement.accept(this);
+        }
+      });
+    }
+  }
+
+  @override
+  void visitClassDeclaration(ClassDeclaration node) {
+    _checkIndentation(node.offset);
+    _checkCommentsAndAnnotations(node);
+    _indent(() {
+      for (final member in node.members) {
+        member.accept(this);
+      }
+    });
+  }
+
+  @override
+  void visitCompilationUnit(CompilationUnit node) {
+    lineInfo = node.lineInfo;
+    super.visitCompilationUnit(node);
   }
 
   @override
@@ -53,113 +77,155 @@ class _StyleVisitor extends GeneralizingAstVisitor<void> {
     // No call to super because comments are treated in visitNode.
     // (only doc comments reach this method)
   }
+  @override
+  void visitConstructorDeclaration(ConstructorDeclaration node) {
+    _checkIndentation(node.offset);
+    _checkCommentsAndAnnotations(node);
+    // TODO visit all
+    if (node.separator?.type == TokenType.COLON) {
+      if (_areOnSameLine(node.parameters.end, node.separator.offset)) {
+        _checkIndentation(node.separator.offset,
+            column: _columnAt(node.parameters.end) + 1);
+      } else {
+        _checkIndentation(node.separator.offset,
+            column: _columnAt(node.firstTokenAfterCommentAndMetadata.offset) +
+                (node.body is EmptyFunctionBody ? 2 : 4));
+      }
+      _indent(() {
+        for (final initializer in node.initializers) {
+          _checkIndentation(initializer.offset);
+          initializer.accept(this);
+        }
+      },
+          padding: _columnAt(node.separator.end) -
+              _columnAt(node.firstTokenAfterCommentAndMetadata.offset) +
+              1);
+    }
+  }
 
   @override
   void visitEnumDeclaration(EnumDeclaration node) {
-    super.visitEnumDeclaration(node);
-    _checkIndentation(node.firstTokenAfterCommentAndMetadata.offset);
+    _checkIndentation(node.offset);
+    _checkCommentsAndAnnotations(node);
+    _indent(() {
+      for (final constant in node.constants) {
+        constant.accept(this);
+      }
+    });
   }
 
   @override
-  void visitForEachStatement(ForEachStatement node) {
-    super.visitForEachStatement(node);
-    _checkIndentation(node.offset);
-  }
-
-  @override
-  void visitForStatement(ForStatement node) {
-    super.visitForStatement(node);
-    _checkIndentation(node.offset);
+  void visitInstanceCreationExpression(InstanceCreationExpression node) {
+    // TODO: implement visitInstanceCreationExpression
+    super.visitInstanceCreationExpression(node);
   }
 
   @override
   void visitIfStatement(IfStatement node) {
-    super.visitIfStatement(node);
-    if (node.parent is! IfStatement) {
+    AstNode parent = node.parent;
+    if (!(parent is IfStatement && parent.elseStatement == node)) {
       _checkIndentation(node.offset);
+      _checkCommentsAndAnnotations(node);
     }
-    if (node.elseKeyword != null) {
-      final thenStatement = node.thenStatement;
-      _checkIndentation(node.elseKeyword.offset,
-          column: thenStatement is Block
-              ? _columnAt(thenStatement.end) + 1
-              : expectedColumn);
+    _indentStatementInControlFlow(node.thenStatement);
+    if (node.elseStatement != null) {
+      if (node.elseStatement is IfStatement) {
+        node.elseStatement.accept(this);
+      } else {
+        _indentStatementInControlFlow(node.elseStatement);
+      }
+    }
+  }
+
+  @override
+  void visitListLiteral(ListLiteral node) {
+    if (_startsLine(node)) {
+      _checkIndentation(node.offset);
+      _checkCommentsAndAnnotations(node);
+    }
+    if (_areOnSameLine(node.leftBracket.offset, node.rightBracket.offset)) {
+    } else {
+      _indent(() {
+        for (final element in node.elements) {
+          _checkIndentation(element.offset);
+          element.accept(this);
+        }
+      });
+    }
+  }
+
+  @override
+  void visitMapLiteral(MapLiteral node) {
+    if (_startsLine(node)) {
+      _checkIndentation(node.offset);
+      _checkCommentsAndAnnotations(node);
+    }
+    if (_areOnSameLine(node.leftBracket.offset, node.rightBracket.offset)) {
+    } else {
+      _indent(() {
+        for (final entry in node.entries) {
+          _checkIndentation(entry.offset);
+          entry.accept(this);
+        }
+      });
     }
   }
 
   @override
   void visitMixinDeclaration(MixinDeclaration node) {
-    super.visitMixinDeclaration(node);
-    _checkIndentation(node.firstTokenAfterCommentAndMetadata.offset);
-  }
-
-  @override
-  void visitNamedCompilationUnitMember(NamedCompilationUnitMember node) {
-    super.visitNamedCompilationUnitMember(node);
-    _checkIndentation(node.firstTokenAfterCommentAndMetadata.offset);
-  }
-
-  @override
-  void visitNode(AstNode node, {bool afterIndent = false}) {
-    if (!afterIndent) {
-      if (node is AnnotatedNode) {
-        for (final annotation in node.metadata) {
-          _checkIndentation(annotation.offset);
-          _visitComments(annotation);
-        }
-      } else {
-        _visitComments(node);
+    _checkIndentation(node.offset);
+    _checkCommentsAndAnnotations(node);
+    _indent(() {
+      for (final member in node.members) {
+        member.accept(this);
       }
-    }
-    if (!afterIndent && _needIndent(node)) {
-      _indent().visitNode(node, afterIndent: true);
-    } else {
-      super.visitNode(node);
-    }
+    });
   }
 
-  bool _needIndent(AstNode node) {
-    return node is BlockFunctionBody ||
-        node is ClassDeclaration ||
-        node is EnumDeclaration ||
-        node is ForEachStatement ||
-        node is ForStatement ||
-        node is MixinDeclaration ||
-        node is IfStatement && node.parent is! IfStatement ||
-        node is SwitchMember ||
-        node is SwitchStatement ||
-        node is TryStatement ||
-        node is WhileStatement;
+  @override
+  void visitNode(AstNode node) {
+    _checkCommentsAndAnnotations(node);
+    super.visitNode(node);
+  }
+
+  @override
+  void visitStatement(Statement node) {
+    if (_startsLine(node)) {
+      _checkIndentation(node.offset);
+    }
+    super.visitStatement(node);
   }
 
   @override
   void visitSwitchMember(SwitchMember node) {
-    super.visitSwitchMember(node);
     _checkIndentation(node.offset);
+    _checkCommentsAndAnnotations(node);
+    for (final statement in node.statements) {
+      _indentStatementInControlFlow(statement);
+    }
   }
 
   @override
   void visitSwitchStatement(SwitchStatement node) {
-    super.visitSwitchStatement(node);
     _checkIndentation(node.offset);
+    _checkCommentsAndAnnotations(node);
+    _indent(() {
+      for (final member in node.members) {
+        member.accept(this);
+      }
+    });
   }
 
-  @override
-  void visitTryStatement(TryStatement node) {
-    super.visitTryStatement(node);
-    _checkIndentation(node.offset);
-  }
+  final _tokenAlreadyCheckedForComments = <Token>[];
 
-  @override
-  void visitWhileStatement(WhileStatement node) {
-    super.visitWhileStatement(node);
-    _checkIndentation(node.offset);
-  }
-
-  void _visitComments(AstNode node) {
+  void _checkComments(AstNode node) {
     Token comment = node.beginToken.precedingComments;
     if (comment == null) {
       return;
+    } else if (_tokenAlreadyCheckedForComments.contains(comment)) {
+      return;
+    } else {
+      _tokenAlreadyCheckedForComments.add(comment);
     }
 
     do {
@@ -172,11 +238,11 @@ class _StyleVisitor extends GeneralizingAstVisitor<void> {
       if (isDoc || !isEol && column > 1) {
         _checkIndentation(
           comment.offset,
-          column: expectedColumn,
-          message: '$column != $expectedColumn' + dumpParents(node),
+          column: indentations.last,
+          message: '$column != ${indentations.last}' + dumpParents(node),
         );
       } else if (isEol && comment.offset - node.beginToken.previous.end < 1) {
-        rule.addError(
+        addError(
           'Put at least one space before end of line comments',
           node.beginToken.previous.end,
           comment.offset - node.beginToken.previous.end,
@@ -185,21 +251,65 @@ class _StyleVisitor extends GeneralizingAstVisitor<void> {
     } while ((comment = comment.next) != null);
   }
 
-  int _lineAt(int offset) => rule.lineInfo.getLocation(offset).lineNumber;
-  int _columnAt(int offset) => rule.lineInfo.getLocation(offset).columnNumber;
+  void _checkCommentsAndAnnotations(AstNode node) {
+    if (node is AnnotatedNode) {
+      for (final annotation in node.metadata) {
+        _checkIndentation(annotation.offset);
+        _checkComments(annotation);
+      }
+    } else {
+      _checkComments(node);
+    }
+  }
+
+  bool _startsLine(AstNode node) {
+    return !_areOnSameLine(node.offset, node.beginToken.previous.end);
+  }
+
+  bool _isOneLiner(AstNode node) {
+    return _areOnSameLine(
+        node.end,
+        node is AnnotatedNode
+            ? node.firstTokenAfterCommentAndMetadata.offset
+            : node.offset);
+  }
+
+  bool _areOnSameLine(int offset1, int offset2) {
+    return _lineAt(offset1) == _lineAt(offset2);
+  }
+
+  int _lineAt(int offset) => lineInfo.getLocation(offset).lineNumber;
+  int _columnAt(int offset) => lineInfo.getLocation(offset).columnNumber;
 
   void _checkIndentation(
     int offset, {
     int column,
     String message,
   }) {
-    column ??= expectedColumn;
+    column ??= indentations.last;
     if (_columnAt(offset) != column) {
-      rule.addError(
-        message ?? 'Bad position (expected at column $column)',
+      addError(
+        message ??
+            'Bad position (expected at column $column) $indentations $column',
         offset,
         0,
       );
+    }
+  }
+
+  void _indent(void Function() f, {int padding = 2}) {
+    indentations.add(indentations.last + padding);
+    f();
+    indentations.removeLast();
+  }
+
+  void _indentStatementInControlFlow(Statement statement, {int padding = 2}) {
+    if (statement is Block) {
+      statement.accept(this);
+    } else {
+      _indent(() {
+        statement.accept(this);
+      }, padding: padding);
     }
   }
 }
