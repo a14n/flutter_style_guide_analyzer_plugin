@@ -56,6 +56,18 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitCascadeExpression(CascadeExpression node) {
+    for (var section in node.cascadeSections) {
+      if (_lineAt(node.offset) != _lineAt(section.offset)) {
+        _indent(() {
+          _checkIndentation(section.offset);
+        });
+      }
+    }
+    node.target?.accept(this);
+  }
+
+  @override
   void visitClassDeclaration(ClassDeclaration node) {
     _checkIndentation(node.offset);
     _checkCommentsAndAnnotations(node);
@@ -77,6 +89,7 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
     // No call to super because comments are treated in visitNode.
     // (only doc comments reach this method)
   }
+
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
     _checkIndentation(node.offset);
@@ -115,12 +128,6 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   @override
-  void visitInstanceCreationExpression(InstanceCreationExpression node) {
-    // TODO: implement visitInstanceCreationExpression
-    super.visitInstanceCreationExpression(node);
-  }
-
-  @override
   void visitIfStatement(IfStatement node) {
     AstNode parent = node.parent;
     if (!(parent is IfStatement && parent.elseStatement == node)) {
@@ -135,6 +142,9 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
         _indentStatementInControlFlow(node.elseStatement);
       }
     }
+    _indent(() {
+      node.condition.accept(this);
+    });
   }
 
   @override
@@ -169,6 +179,32 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
         }
       });
     }
+  }
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    void f() {
+      if (node.operator != null) {
+        _checkIndentation(node.function.offset,
+            column: _columnAt(node.operator.end));
+      }
+      if (node.typeArguments != null) {
+        _checkIndentation(node.typeArguments.offset,
+            column: _columnAt(node.function.end));
+        node.typeArguments.accept(this);
+      }
+      node.argumentList.accept(this);
+    }
+
+    if (_lineAt(node.offset) != _lineAt(node.function.offset)) {
+      _indent(() {
+        _checkIndentation(node.operator.offset);
+        f();
+      });
+    } else {
+      f();
+    }
+    node.target?.accept(this);
   }
 
   @override
