@@ -16,6 +16,22 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitAssignmentExpression(AssignmentExpression node) {
+    node.leftHandSide.accept(this);
+    _checkIndentation(node.operator.offset,
+        column: _columnAt(node.leftHandSide.end) + 1);
+    if (_lineAt(node.offset) != _lineAt(node.rightHandSide.offset)) {
+      _indent(() {
+        node.rightHandSide.accept(this);
+      });
+    } else {
+      _checkIndentation(node.rightHandSide.offset,
+          column: _columnAt(node.operator.end) + 1);
+      node.rightHandSide.accept(this);
+    }
+  }
+
+  @override
   void visitArgumentList(ArgumentList node) {
     if (node.arguments.isEmpty) {
       return;
@@ -128,6 +144,47 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitFormalParameterList(FormalParameterList node) {
+    if (node.leftDelimiter != null &&
+        node.parameters.every((e) => e.isOptional)) {
+      _checkIndentation(node.leftDelimiter.offset,
+          column: _columnAt(node.leftParenthesis.end));
+    }
+    if (node.rightDelimiter != null) {
+      _checkIndentation(node.rightParenthesis.offset,
+          column: _columnAt(node.rightDelimiter.end));
+    }
+    for (final parameter in node.parameters) {
+      if (parameter.endToken.next.type == TokenType.COMMA) {
+        _checkIndentation(parameter.endToken.next.offset,
+            column: _columnAt(parameter.endToken.end));
+      }
+    }
+    if (_areOnSameLine(
+        node.leftParenthesis.offset, node.rightParenthesis.offset)) {
+      for (final parameter in node.parameters) {
+        parameter.accept(this);
+      }
+    } else {
+      _indent(() {
+        for (final parameter in node.parameters) {
+          _checkIndentation(parameter.offset);
+          parameter.accept(this);
+        }
+      });
+      if (node.rightDelimiter != null) {
+        if (node.parameters.any((e) => e.isRequired)) {
+          _checkIndentation(node.leftDelimiter.offset,
+              column: _columnAt(node.leftDelimiter.previous.end) + 1);
+        }
+        _checkIndentation(node.rightDelimiter.offset);
+      } else {
+        _checkIndentation(node.rightParenthesis.offset);
+      }
+    }
+  }
+
+  @override
   void visitIfStatement(IfStatement node) {
     AstNode parent = node.parent;
     if (!(parent is IfStatement && parent.elseStatement == node)) {
@@ -157,7 +214,9 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
     } else {
       _indent(() {
         for (final element in node.elements) {
-          _checkIndentation(element.offset);
+          if (_startsLine(element)) {
+            _checkIndentation(element.offset);
+          }
           element.accept(this);
         }
       });
@@ -220,16 +279,22 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
 
   @override
   void visitNode(AstNode node) {
+    if (_startsLine(node)) {
+      _checkIndentation(node.offset);
+    }
     _checkCommentsAndAnnotations(node);
     super.visitNode(node);
   }
 
   @override
-  void visitStatement(Statement node) {
-    if (_startsLine(node)) {
-      _checkIndentation(node.offset);
+  void visitShowCombinator(ShowCombinator node) {
+    if (!_areOnSameLine(node.offset, node.end)) {
+      _indent(() {
+        for (final name in node.shownNames) {
+          name.accept(this);
+        }
+      });
     }
-    super.visitStatement(node);
   }
 
   @override
@@ -250,6 +315,27 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
         member.accept(this);
       }
     });
+  }
+
+  @override
+  void visitVariableDeclaration(VariableDeclaration node) {
+    if (_startsLine(node)) {
+      _checkIndentation(node.offset);
+      _checkCommentsAndAnnotations(node);
+    }
+    if (node.equals != null) {
+      _checkIndentation(node.equals.offset,
+          column: _columnAt(node.name.end) + 1);
+      if (_lineAt(node.offset) != _lineAt(node.initializer.offset)) {
+        _indent(() {
+          node.initializer.accept(this);
+        });
+      } else {
+        _checkIndentation(node.initializer.offset,
+            column: _columnAt(node.equals.end) + 1);
+        node.initializer.accept(this);
+      }
+    }
   }
 
   final _tokenAlreadyCheckedForComments = <Token>[];
@@ -299,7 +385,8 @@ class StyleRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   bool _startsLine(AstNode node) {
-    return !_areOnSameLine(node.offset, node.beginToken.previous.end);
+    return node.beginToken.previous == null ||
+        !_areOnSameLine(node.offset, node.beginToken.previous.end);
   }
 
   bool _isOneLiner(AstNode node) {
