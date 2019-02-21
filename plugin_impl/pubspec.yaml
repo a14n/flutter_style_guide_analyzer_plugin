@@ -1,9 +1,10 @@
-name: flutter_style_guide_analyzer_plugin
+name: flutter_style_guide_analyzer_plugin_impl
+version: 0.0.1
 description: Dart analyzer plugin for enforcing Flutter Style Guide
 environment:
   sdk: '>=2.0.0 <3.0.0'
 dependencies:
-  analyzer: 0.33.6+1
-  analyzer_plugin: 0.0.1-alpha.5
+  analyzer_plugin: 0.0.1-alpha.6
 dev_dependencies:
   test: ^1.3.4
+  path: ^1.6.2

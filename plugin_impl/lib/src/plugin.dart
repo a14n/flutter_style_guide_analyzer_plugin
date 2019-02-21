@@ -15,8 +15,6 @@ import 'package:analyzer_plugin/protocol/protocol_generated.dart' as plugin;
 import 'checker.dart';
 
 class FlutterStyleGuidePlugin extends ServerPlugin {
-  final Checker checker = new Checker();
-
   FlutterStyleGuidePlugin(ResourceProvider provider) : super(provider);
 
   @override
@@ -32,8 +30,7 @@ class FlutterStyleGuidePlugin extends ServerPlugin {
     final dartDriver = contextBuilder.buildDriver(root);
     dartDriver.results.listen((result) async {
       final path = result.path;
-      final unit = result.unit ??
-          (await dartDriver.getUnitElement(path)).element.computeNode();
+      final unit = result.unit ?? (await dartDriver.getResult(path)).unit;
       _processResult(path, unit);
     });
     return dartDriver;
@@ -56,15 +53,15 @@ class FlutterStyleGuidePlugin extends ServerPlugin {
   /// Computes errors based on an analysis result and notifies the analyzer.
   void _processResult(String path, CompilationUnit unit) {
     try {
-      final checkResult = checker.check(unit);
+      final checkResult = check(unit);
       channel.sendNotification(
-          plugin.AnalysisErrorsParams(path, checkResult.keys.toList())
-              .toNotification());
+        plugin.AnalysisErrorsParams(path, checkResult.keys.toList())
+          .toNotification());
     } catch (e, stackTrace) {
       // Notify the analyzer that an exception happened.
       channel.sendNotification(
-          plugin.PluginErrorParams(false, e.toString(), stackTrace.toString())
-              .toNotification());
+        plugin.PluginErrorParams(false, e.toString(), stackTrace.toString())
+          .toNotification());
     }
   }
 
@@ -75,32 +72,32 @@ class FlutterStyleGuidePlugin extends ServerPlugin {
 
   @override
   Future<plugin.EditGetFixesResult> handleEditGetFixes(
-      plugin.EditGetFixesParams parameters) async {
+    plugin.EditGetFixesParams parameters,
+  ) async {
     try {
       final analysisResult =
-          await (driverForPath(parameters.file) as AnalysisDriver)
-              .getResult(parameters.file);
+        await (driverForPath(parameters.file) as AnalysisDriver)
+          .getResult(parameters.file);
 
       // Get errors and fixes for the file.
-      final checkResult = checker.check(analysisResult.unit);
+      final checkResult = check(analysisResult.unit);
 
       // Return any fixes that are for the expected file.
       final fixes = <plugin.AnalysisErrorFixes>[];
       for (final error in checkResult.keys) {
         if (error.location.file == parameters.file &&
             checkResult[error].change.edits.single.edits.isNotEmpty) {
-          fixes.add(new plugin.AnalysisErrorFixes(error,
-              fixes: [checkResult[error]]));
+          fixes.add(plugin.AnalysisErrorFixes(error, fixes: [checkResult[error]]));
         }
       }
 
-      return new plugin.EditGetFixesResult(fixes);
+      return plugin.EditGetFixesResult(fixes);
     } catch (e, stackTrace) {
       // Notify the analyzer that an exception happened.
-      channel.sendNotification(new plugin.PluginErrorParams(
-              false, e.toString(), stackTrace.toString())
+      channel.sendNotification(
+        plugin.PluginErrorParams(false, e.toString(), stackTrace.toString())
           .toNotification());
-      return new plugin.EditGetFixesResult([]);
+      return plugin.EditGetFixesResult([]);
     }
   }
 }
