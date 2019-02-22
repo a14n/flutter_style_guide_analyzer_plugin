@@ -1,5 +1,5 @@
 name: flutter_style_guide_analyzer_plugin
 version: 0.0.1
-description: Dart analyzer plugin loader for enforcing Flutter Style Guide
+description: Dart analyzer plugin for enforcing Flutter Style Guide
 environment:
   sdk: '>=2.0.0 <3.0.0'

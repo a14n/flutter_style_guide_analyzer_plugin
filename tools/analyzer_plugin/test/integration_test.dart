@@ -37,7 +37,7 @@ environment:
 
 dev_dependencies:
   flutter_style_guide_analyzer_plugin:
-    path: ${dirname(currentFile.path) + '/../../plugin'}
+    path: ${dirname(currentFile.path) + '/../../..'}
 ''',
   );
 

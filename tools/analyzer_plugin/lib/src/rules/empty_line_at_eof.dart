@@ -1,7 +1,7 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
-import 'package:flutter_style_guide_analyzer_plugin_impl/src/checker.dart';
+import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 
 class EmptyLineAtEOFRule extends Rule {
   EmptyLineAtEOFRule(ErrorReporter addError)

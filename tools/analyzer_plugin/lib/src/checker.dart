@@ -1,7 +1,7 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:analyzer_plugin/protocol/protocol_generated.dart';
-import 'package:flutter_style_guide_analyzer_plugin_impl/src/rules/empty_line_at_eof.dart';
+import 'package:flutter_style_guide_analyzer_plugin/src/rules/empty_line_at_eof.dart';
 
 Map<AnalysisError, PrioritizedSourceChange> check(CompilationUnit unit) {
   final result = <AnalysisError, PrioritizedSourceChange>{};
