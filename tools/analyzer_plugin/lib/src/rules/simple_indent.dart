@@ -58,7 +58,17 @@ class SimpleIndentRule extends Rule with GeneralizingAstVisitor<void> {
 
   @override
   void visitBlockFunctionBody(BlockFunctionBody node) {
-    if (!_isOneLiner(node.block)) {
+    if (node.keyword != null) {
+      _checkSpaceBefore(node.keyword, 1);
+      if (node.star != null) {
+        _checkSpaceBefore(node.star, 0);
+      }
+    }
+    _checkSpaceBefore(node.block.leftBracket, 1);
+    if (_isOneLiner(node.block)) {
+      _checkSpaceAfter(node.block.leftBracket, 1);
+      _checkSpaceBefore(node.block.rightBracket, 1);
+    } else {
       int columnRef;
       AstNode current = node;
       final descendants = <AstNode>[];
@@ -131,9 +141,10 @@ class SimpleIndentRule extends Rule with GeneralizingAstVisitor<void> {
           0,
         );
         return;
-      } else if (columnRef != _columnAt(node.endToken.offset)) {
+      } else if (columnRef != _columnAt(node.endToken.offset) ||
+          !_tokenStartsLine(node.endToken)) {
         addError(
-          'This closing parenthesis should be at column $columnRef',
+          'This closing parenthesis should start the line at column $columnRef',
           node.endToken.offset,
           1,
         );
@@ -291,5 +302,60 @@ class SimpleIndentRule extends Rule with GeneralizingAstVisitor<void> {
     final location = lineInfo.getLocation(offset);
     return (line == null || line == location.lineNumber) &&
         column == location.columnNumber;
+  }
+
+  void _checkSpaceBefore(Token token, int numberOfSpaces) {
+    final previousToken = _previousToken(token);
+    if (previousToken == null ||
+        _areNotOnSameLine(previousToken.end, token.offset)) {
+      return;
+    }
+
+    final locationOfPreviousEnd = lineInfo.getLocation(previousToken.end);
+    if (!_isOffsetAtLocation(token.offset,
+        line: locationOfPreviousEnd.lineNumber,
+        column: locationOfPreviousEnd.columnNumber + numberOfSpaces)) {
+      addError(
+        'There should be $numberOfSpaces space',
+        previousToken.end,
+        token.offset - previousToken.end,
+        subCode: 'space.before',
+      );
+    }
+  }
+
+  void _checkSpaceAfter(Token token, int numberOfSpaces) {
+    final nextToken = _nextToken(token);
+    if (nextToken == null || _areNotOnSameLine(token.end, nextToken.offset)) {
+      return;
+    }
+
+    final locationOfEnd = lineInfo.getLocation(token.end);
+    if (!_isOffsetAtLocation(nextToken.offset,
+        line: locationOfEnd.lineNumber,
+        column: locationOfEnd.columnNumber + numberOfSpaces)) {
+      addError(
+        'There should be $numberOfSpaces space',
+        token.end,
+        nextToken.offset - token.end,
+        subCode: 'space.after',
+      );
+    }
+  }
+
+  Token _nextToken(Token token) {
+    return token?.next?.precedingComments ?? token?.next;
+  }
+
+  Token _previousToken(Token token) {
+    if (token.precedingComments != null) {
+      Token result = token.precedingComments;
+      while (result.next != null) {
+        result = result.next;
+      }
+      return result;
+    } else {
+      return token.previous;
+    }
   }
 }
