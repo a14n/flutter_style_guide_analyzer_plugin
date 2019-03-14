@@ -1,4 +1,4 @@
-// LINTS :8
+// LINT :8
 f(int a
 ){
 }

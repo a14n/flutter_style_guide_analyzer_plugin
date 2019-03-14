@@ -6,8 +6,8 @@ import 'package:flutter_style_guide_analyzer_plugin/src/ast_util.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 import 'package:meta/meta.dart';
 
-class SimpleIndentRule extends Rule with GeneralizingAstVisitor<void> {
-  SimpleIndentRule(ErrorReporter addError) : super('simple_indent', addError);
+class FormatRule extends Rule with GeneralizingAstVisitor<void> {
+  FormatRule(ErrorReporter addError) : super('format', addError);
 
   LineInfo lineInfo;
 
@@ -57,6 +57,79 @@ class SimpleIndentRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitNode(AstNode node) {
+    if (_startsLine(node)) {
+      _checkIndent(node, node.offset);
+    }
+    super.visitNode(node);
+  }
+
+  @override
+  void visitMethodInvocation(MethodInvocation node) {
+    if (node.operator != null && _tokenStartsLine(node.operator)) {
+      _checkIndent(node.methodName, node.operator.offset);
+    }
+    super.visitMethodInvocation(node);
+  }
+
+  @override
+  void visitPropertyAccess(PropertyAccess node) {
+    if (node.operator != null && _tokenStartsLine(node.operator)) {
+      _checkIndent(node.propertyName, node.operator.offset);
+    }
+    super.visitPropertyAccess(node);
+  }
+
+  @override
+  void visitBlock(Block node) {
+    if (_isOneLiner(node)) {
+      _checkSpaceAfter(node.leftBracket, 1);
+      _checkSpaceBefore(node.rightBracket, 1);
+    } else if (node.rightBracket.precedingComments == null &&
+        node.statements.isEmpty) {
+      if (_areNotOnSameLine(
+          node.leftBracket.offset, node.rightBracket.offset)) {
+        addError(
+          'Use a oneliner for empty block',
+          node.leftBracket.offset,
+          node.rightBracket.end - node.leftBracket.offset,
+        );
+      }
+    } else {
+      int column = _startOfLine(node.leftBracket);
+      if (column != _columnAt(node.rightBracket.offset) ||
+          !_tokenStartsLine(node.rightBracket)) {
+        addError(
+          'This closing parenthesis should start the line at column $column',
+          node.rightBracket.offset,
+          1,
+        );
+      }
+
+      // check every statements on their own lines and at the good column
+      final lines = <int>[];
+      for (final statement in node.statements) {
+        final line = _lineAt(statement.offset);
+        if (lines.contains(line)) {
+          addError(
+            'This statement should be on its own line',
+            statement.offset,
+            statement.length,
+          );
+        } else if (_columnAt(_getRealOffset(statement)) != column + 2) {
+          addError(
+            'This statement should start at column $column',
+            statement.offset,
+            statement.length,
+          );
+        }
+        lines.add(line);
+      }
+    }
+    super.visitBlock(node);
+  }
+
+  @override
   void visitBlockFunctionBody(BlockFunctionBody node) {
     if (node.keyword != null) {
       _checkSpaceBefore(node.keyword, 1);
@@ -65,98 +138,6 @@ class SimpleIndentRule extends Rule with GeneralizingAstVisitor<void> {
       }
     }
     _checkSpaceBefore(node.block.leftBracket, 1);
-    if (_isOneLiner(node.block)) {
-      _checkSpaceAfter(node.block.leftBracket, 1);
-      _checkSpaceBefore(node.block.rightBracket, 1);
-    } else {
-      int columnRef;
-      AstNode current = node;
-      final descendants = <AstNode>[];
-      for (;;) {
-        descendants.insert(0, current);
-        current = current.parent;
-        if (current == null) {
-          break;
-        }
-        if (current is Statement ||
-            current is ConstructorDeclaration ||
-            current is ConstructorFieldInitializer ||
-            current is SuperConstructorInvocation ||
-            current is FunctionDeclaration ||
-            current is MethodDeclaration ||
-            current is FieldDeclaration ||
-            current is TopLevelVariableDeclaration ||
-            current is Assertion) {
-          columnRef = _columnAt(_getRealOffset(current));
-          break;
-        }
-        if (_startsLine(current) &&
-            (current is NamedExpression ||
-                current is MapLiteralEntry ||
-                current is FunctionExpression ||
-                current is InstanceCreationExpression)) {
-          columnRef = _columnAt(_getRealOffset(current));
-          break;
-        }
-        if (current is MethodInvocation) {
-          if (current.operator != null) {
-            if (_tokenStartsLine(current.operator)) {
-              columnRef = _columnAt(current.operator.offset);
-              break;
-            }
-            if (current.target != null && _startsLine(current.target)) {
-              columnRef = _columnAt(_getRealOffset(current));
-              break;
-            }
-          } else if (_startsLine(current)) {
-            columnRef = _columnAt(_getRealOffset(current));
-            break;
-          }
-        }
-        if (current is ConditionalExpression) {
-          if (descendants.first == current.thenExpression &&
-              _tokenStartsLine(current.question)) {
-            columnRef = _columnAt(_getRealOffset(descendants.first));
-            break;
-          }
-          if (descendants.first == current.elseExpression &&
-              _tokenStartsLine(current.colon)) {
-            columnRef = _columnAt(_getRealOffset(descendants.first));
-            break;
-          }
-        }
-        if (current is ListLiteral && _startsLine(descendants.first)) {
-          columnRef = _columnAt(_getRealOffset(descendants.first));
-          break;
-        }
-        if (current is CascadeExpression && _startsLine(descendants.first)) {
-          columnRef = _columnAt(_getRealOffset(descendants.first));
-          break;
-        }
-      }
-      if (columnRef == null) {
-        addError(
-          'unknown ancestor:' + dumpParents(node),
-          node.offset,
-          0,
-        );
-        return;
-      } else if (columnRef != _columnAt(node.endToken.offset) ||
-          !_tokenStartsLine(node.endToken)) {
-        addError(
-          'This closing parenthesis should start the line at column $columnRef',
-          node.endToken.offset,
-          1,
-        );
-      }
-      int column = columnRef + 2;
-      for (final e in node.block.statements) {
-        _checkLocation(_getRealOffset(e),
-            column: column,
-            message: 'expected at column $column : ' + dumpParents(node));
-        _checkCommentsAndAnnotations(e);
-      }
-    }
     super.visitBlockFunctionBody(node);
   }
 
@@ -186,6 +167,85 @@ class SimpleIndentRule extends Rule with GeneralizingAstVisitor<void> {
     _checkLocation(_getRealOffset(node), column: 1);
     _checkCommentsAndAnnotations(node);
     super.visitTypeAlias(node);
+  }
+
+
+  int _getBaseColumn(AstNode node, int offset) {
+    int column;
+    var current = node;
+    var child;
+    for (;;) {
+      child = current;
+      current = current?.parent;
+      if (current == null) break;
+      if (current.offset == offset) continue;
+
+      if (current is MethodInvocation &&
+          child is ArgumentList &&
+          current.operator != null &&
+          _tokenStartsLine(current.operator) &&
+          _areNotOnSameLine(current.operator.offset, offset)) {
+        column = _columnAt(current.operator.offset) + 2;
+        break;
+      }
+      if (current is MethodInvocation &&
+          current.operator != null &&
+          _startsLine(current) &&
+          _areNotOnSameLine(current.target.offset, current.operator.offset)) {
+        column = _columnAt(current.target.offset) +
+            ((!_isOneLiner(current.target) &&
+                    _columnAt(_getRealOffset(current.target)) ==
+                        _columnAt(_startOfLine(current.target.endToken)))
+                ? 0
+                : 2);
+        break;
+      }
+      if (current is PropertyAccess &&
+          current.operator != null &&
+          _startsLine(current) &&
+          _areNotOnSameLine(current.target.offset, current.operator.offset)) {
+        column = _columnAt(current.target.offset) +
+            ((!_isOneLiner(current.target) &&
+                    _columnAt(_getRealOffset(current.target)) ==
+                        _columnAt(_startOfLine(current.target.endToken)))
+                ? 0
+                : 2);
+        break;
+      }
+      if (_startsLine(current) &&
+          _areNotOnSameLine(current.offset, offset) &&
+          (current is Statement ||
+              current is MapLiteralEntry ||
+              current is MapLiteral ||
+              current is ListLiteral ||
+              current is SetLiteral ||
+              current is NamedExpression ||
+              current is InstanceCreationExpression ||
+              current is SwitchMember ||
+              current is MethodInvocation ||
+              current is! AdjacentStrings && current?.parent is ArgumentList ||
+              current?.parent is CascadeExpression)) {
+        column = _columnAt(current.offset) + 2;
+        break;
+      }
+      if (current is ConditionalExpression &&
+          _areNotOnSameLine(current.offset, current.elseExpression.offset) &&
+          current.condition != child) {
+        column = _columnAt(child.offset) + 2;
+        break;
+      }
+    }
+    return column;
+  }
+
+
+  void _checkIndent(AstNode node, int offset) {
+    int column = _getBaseColumn(node, offset);
+    if (column != null) {
+      _checkLocation(offset,
+          column: column,
+          message: 'expected at column $column: ' + dumpParents(node));
+    }
   }
 
   final _tokenAlreadyCheckedForComments = <Token>[];
@@ -250,9 +310,11 @@ class SimpleIndentRule extends Rule with GeneralizingAstVisitor<void> {
         !_areOnSameLine(token.offset, token.previous.end);
   }
 
-  int _startOfLine(AstNode node) {
-    var token = node.beginToken;
-    while (_areOnSameLine(token.offset, token.previous.offset)) {
+  int _startOfLine(Token token) {
+    while (token.previous != null &&
+        token.previous.offset != -1 &&
+        token.previous != token &&
+        _areOnSameLine(token.offset, token.previous.offset)) {
       token = token.previous;
     }
     return _columnAt(token.offset);

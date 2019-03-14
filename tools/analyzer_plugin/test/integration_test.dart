@@ -118,6 +118,7 @@ analyzer:
     }
   }
 
+        print(errorsPerFile);
   for (var entry in errorsPerFile.entries) {
     final file = entry.key;
     final errors = entry.value;
@@ -131,23 +132,33 @@ analyzer:
           .map((e) =>
               '${e['location']['startLine']}:${e['location']['startColumn']}')
           .toList();
-      for (var lint in expectedLints) {
-        expect(actualLints, contains(lint));
-      }
-      for (var lint in actualLints) {
-        expect(expectedLints, contains(lint));
+      try {
+        for (var lint in expectedLints) {
+          expect(actualLints, contains(lint));
+        }
+        for (var lint in actualLints) {
+          expect(expectedLints, contains(lint));
+        }
+      } catch (e) {
+        print(file);
+        print('expected: $expectedLints');
+        errors
+            .where((e) => (e['code'] as String)
+                .startsWith('flutter_style.${dirname(file)}'))
+            .forEach(print);
+        rethrow;
       }
     });
   }
 }
 
-const lintsPattern = '// LINTS ';
+const lintsPattern = '// LINT ';
 
 List<CharacterLocation> readLints(File file) {
   final result = <CharacterLocation>[];
   int currentLineNumber = 1;
   for (final line in file.readAsLinesSync()) {
-    if (line.startsWith(lintsPattern)) {
+    if (line.trimLeft().startsWith(lintsPattern)) {
       line
           .substring(lintsPattern.length)
           .split(' ')
