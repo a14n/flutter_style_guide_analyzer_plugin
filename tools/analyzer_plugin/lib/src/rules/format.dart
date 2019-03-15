@@ -2,6 +2,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
+import 'package:flutter_style_guide_analyzer_plugin/src/ast_util.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 import 'package:meta/meta.dart';
 
@@ -138,9 +139,10 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     _checkSpaceBefore(node.parameters.beginToken, 0);
     node.parameters.accept(this);
     if (node.separator != null) {
-      _checkSpaceBefore(node.separator, 1);
+      if (_areOnSameLine(node.separator.offset, node.parameters.end)) {
+        _checkSpaceBefore(node.separator, 1);
+      }
       _checkSpaceAfter(node.separator, 1);
-
       if (node.initializers != null) {
         if (_isOneLiner(node) && node.initializers.length == 1) {
           node.initializers.accept(this);
@@ -177,7 +179,8 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
       _unIndent();
     }
     if (node.elseKeyword != null) {
-      if (node.thenStatement is Block) {
+      if (node.thenStatement is Block &&
+          node.elseKeyword.precedingComments == null) {
         _checkSpaceBefore(node.elseKeyword, 1);
       } else {
         _checkTokenStartsLine(node.elseKeyword);
@@ -191,6 +194,56 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
         node.elseStatement.accept(this);
         _unIndent();
       }
+    }
+  }
+
+  @override
+  void visitMapLiteral(MapLiteral node) {
+    if (node.rightBracket.precedingComments == null && node.entries.isEmpty) {
+      _checkSpaceAfter(node.leftBracket, 0);
+    } else if (_isOneLiner(node)) {
+      if (node.entries.length > 1) {
+        addError('every entries should be on its own line',
+            node.entries.beginToken.offset, 0);
+      } else {
+        _checkSpaceAfter(node.leftBracket, 0);
+        node.entries.accept(this);
+        _checkSpaceBefore(node.rightBracket, 0);
+        if (node.rightBracket.previous.type == TokenType.COMMA) {
+          addError('avoid trailing comma in a single element one liner map.',
+              node.rightBracket.previous.offset, 1);
+        }
+      }
+    } else {
+      _indent();
+      for (var entry in node.entries) {
+        final token = entry.beginToken;
+        _checkTokenStartsLine(token);
+        _checkTokenIndent(token);
+        if (entry.endToken.next.type != TokenType.COMMA) {
+          addError('Add a trailing comma.', entry.endToken.end, 0);
+        }
+      }
+      node.entries.accept(this);
+      _unIndent();
+      _checkTokenIndent(node.rightBracket);
+    }
+  }
+
+  @override
+  void visitMapLiteralEntry(MapLiteralEntry node) {
+    node.key.accept(this);
+    _checkSpaceBefore(node.separator, 0);
+    if (_areOnSameLine(node.separator.offset, node.value.offset)) {
+      _checkSpaceAfter(node.separator, 1);
+      node.value.accept(this);
+    } else {
+      _indent();
+      node.value.accept(this);
+      _unIndent();
+    }
+    if (node.endToken.next.type == TokenType.COMMA) {
+      _checkSpaceAfter(node.endToken, 0);
     }
   }
 
@@ -315,10 +368,14 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
         column == location.columnNumber;
   }
 
-  void _checkSpaceBefore(Token token, int numberOfSpaces) {
+  void _checkSpaceBefore(
+    Token token,
+    int numberOfSpaces, {
+    bool skipIfEol = false,
+  }) {
     final previousToken = _previousToken(token);
     if (previousToken == null ||
-        _areNotOnSameLine(previousToken.end, token.offset)) {
+        skipIfEol && _areNotOnSameLine(previousToken.end, token.offset)) {
       return;
     }
 
@@ -335,9 +392,14 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     }
   }
 
-  void _checkSpaceAfter(Token token, int numberOfSpaces) {
+  void _checkSpaceAfter(
+    Token token,
+    int numberOfSpaces, {
+    bool skipIfEol = false,
+  }) {
     final nextToken = _nextToken(token);
-    if (nextToken == null || _areNotOnSameLine(token.end, nextToken.offset)) {
+    if (nextToken == null ||
+        skipIfEol && _areNotOnSameLine(token.end, nextToken.offset)) {
       return;
     }
 

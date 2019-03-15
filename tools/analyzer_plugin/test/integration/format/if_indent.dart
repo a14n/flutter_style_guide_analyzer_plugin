@@ -80,4 +80,18 @@ test_spaces() {
   else  {
     m;
   }
+
+  // allow comment before else
+  if (m)
+    m;
+  // comment
+  else
+    m;
+  if (m) {
+    m;
+  }
+  // comment
+  else {
+    m;
+  }
 }
