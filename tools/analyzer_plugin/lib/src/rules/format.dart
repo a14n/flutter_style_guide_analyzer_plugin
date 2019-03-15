@@ -2,7 +2,6 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
-import 'package:flutter_style_guide_analyzer_plugin/src/ast_util.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 import 'package:meta/meta.dart';
 
@@ -11,101 +10,53 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
 
   LineInfo lineInfo;
 
+  final _indents = <int>[];
+
+  static const defaultIndent = 2;
+
+  void _indent([int size = defaultIndent]) {
+    _indents.add(_indents.last + size);
+  }
+
+  void _unIndent() {
+    _indents.removeLast();
+  }
+
   @override
   void visitAnnotation(Annotation node) {
     // No call to super because annotations are treated in visitNode.
   }
 
   @override
-  void visitClassDeclaration(ClassDeclaration node) {
-    _checkLocation(_getRealOffset(node), column: 1);
+  void visitAnnotatedNode(AnnotatedNode node) {
     _checkCommentsAndAnnotations(node);
-    super.visitClassDeclaration(node);
+    super.visitAnnotatedNode(node);
   }
 
   @override
-  void visitCompilationUnit(CompilationUnit node) {
-    lineInfo = node.lineInfo;
-    super.visitCompilationUnit(node);
-  }
-
-  @override
-  void visitComment(Comment node) {
-    // No call to super because comments are treated in visitNode.
-    // (only doc comments reach this method)
-  }
-
-  @override
-  void visitConstructorDeclaration(ConstructorDeclaration node) {
-    _checkLocation(_getRealOffset(node), column: 3);
-    _checkCommentsAndAnnotations(node);
-    super.visitConstructorDeclaration(node);
-  }
-
-  @override
-  void visitDirective(Directive node) {
-    _checkLocation(_getRealOffset(node), column: 1);
-    _checkCommentsAndAnnotations(node);
-    super.visitDirective(node);
-  }
-
-  @override
-  void visitFieldDeclaration(FieldDeclaration node) {
-    _checkLocation(_getRealOffset(node), column: 3);
-    _checkCommentsAndAnnotations(node);
-    super.visitFieldDeclaration(node);
-  }
-
-  @override
-  void visitNode(AstNode node) {
-    if (_startsLine(node)) {
-      _checkIndent(node, node.offset);
-    }
-    super.visitNode(node);
-  }
-
-  @override
-  void visitMethodInvocation(MethodInvocation node) {
-    if (node.operator != null && _tokenStartsLine(node.operator)) {
-      _checkIndent(node.methodName, node.operator.offset);
-    }
-    super.visitMethodInvocation(node);
-  }
-
-  @override
-  void visitPropertyAccess(PropertyAccess node) {
-    if (node.operator != null && _tokenStartsLine(node.operator)) {
-      _checkIndent(node.propertyName, node.operator.offset);
-    }
-    super.visitPropertyAccess(node);
+  void visitAssertInitializer(AssertInitializer node) {
+    _checkIndent(node);
+    super.visitAssertInitializer(node);
   }
 
   @override
   void visitBlock(Block node) {
+    if (_startsLine(node)) _checkIndent(node);
     if (_isOneLiner(node)) {
       _checkSpaceAfter(node.leftBracket, 1);
       _checkSpaceBefore(node.rightBracket, 1);
+      for (final statement in node.statements.skip(1)) {
+        _checkSpaceBefore(statement.beginToken, 1);
+      }
+      super.visitBlock(node);
     } else if (node.rightBracket.precedingComments == null &&
         node.statements.isEmpty) {
-      if (_areNotOnSameLine(
-          node.leftBracket.offset, node.rightBracket.offset)) {
-        addError(
-          'Use a oneliner for empty block',
-          node.leftBracket.offset,
-          node.rightBracket.end - node.leftBracket.offset,
-        );
-      }
+      addError(
+        'Use a oneliner for empty block',
+        node.leftBracket.offset,
+        node.rightBracket.end - node.leftBracket.offset,
+      );
     } else {
-      int column = _startOfLine(node.leftBracket);
-      if (column != _columnAt(node.rightBracket.offset) ||
-          !_tokenStartsLine(node.rightBracket)) {
-        addError(
-          'This closing parenthesis should start the line at column $column',
-          node.rightBracket.offset,
-          1,
-        );
-      }
-
       // check every statements on their own lines and at the good column
       final lines = <int>[];
       for (final statement in node.statements) {
@@ -116,17 +67,14 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
             statement.offset,
             statement.length,
           );
-        } else if (_columnAt(_getRealOffset(statement)) != column + 2) {
-          addError(
-            'This statement should start at column $column',
-            statement.offset,
-            statement.length,
-          );
         }
         lines.add(line);
       }
+      _indent();
+      node.visitChildren(this);
+      _unIndent();
+      _checkTokenIndent(node.rightBracket);
     }
-    super.visitBlock(node);
   }
 
   @override
@@ -142,110 +90,100 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   @override
-  void visitMethodDeclaration(MethodDeclaration node) {
-    _checkLocation(_getRealOffset(node), column: 3);
-    _checkCommentsAndAnnotations(node);
-    super.visitMethodDeclaration(node);
+  void visitClassDeclaration(ClassDeclaration node) {
+    _checkStartsLine(node);
+    _checkIndent(node);
+    _indent();
+    node.visitChildren(this);
+    _unIndent();
   }
 
   @override
-  void visitMixinDeclaration(MixinDeclaration node) {
-    _checkLocation(_getRealOffset(node), column: 1);
-    _checkCommentsAndAnnotations(node);
-    super.visitMixinDeclaration(node);
+  void visitClassMember(ClassMember node) {
+    _checkStartsLine(node);
+    _checkIndent(node);
+    super.visitClassMember(node);
   }
 
   @override
-  void visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
-    _checkLocation(_getRealOffset(node), column: 1);
-    _checkCommentsAndAnnotations(node);
-    super.visitTopLevelVariableDeclaration(node);
+  void visitCompilationUnit(CompilationUnit node) {
+    lineInfo = node.lineInfo;
+    _indents.add(1);
+    super.visitCompilationUnit(node);
+    _unIndent();
   }
 
   @override
-  void visitTypeAlias(TypeAlias node) {
-    _checkLocation(_getRealOffset(node), column: 1);
-    _checkCommentsAndAnnotations(node);
-    super.visitTypeAlias(node);
+  void visitCompilationUnitMember(CompilationUnitMember node) {
+    _checkStartsLine(node);
+    _checkIndent(node);
+    super.visitCompilationUnitMember(node);
   }
 
+  @override
+  void visitComment(Comment node) {
+    // No call to super because comments are treated in visitNode.
+    // (only doc comments reach this method)
+  }
 
-  int _getBaseColumn(AstNode node, int offset) {
-    int column;
-    var current = node;
-    var child;
-    for (;;) {
-      child = current;
-      current = current?.parent;
-      if (current == null) break;
-      if (current.offset == offset) continue;
+  @override
+  void visitConstructorDeclaration(ConstructorDeclaration node) {
+    if (node.initializers != null) {
+      if (!_isOneLiner(node)) {
+        _indent(
+            node.parameters.endToken.offset - _getBeginToken(node).offset + 2);
+        node.initializers.accept(this);
+        _unIndent();
+      }
+    } else {
+      super.visitConstructorDeclaration(node);
+    }
+  }
 
-      if (current is MethodInvocation &&
-          child is ArgumentList &&
-          current.operator != null &&
-          _tokenStartsLine(current.operator) &&
-          _areNotOnSameLine(current.operator.offset, offset)) {
-        column = _columnAt(current.operator.offset) + 2;
-        break;
+  @override
+  void visitConstructorFieldInitializer(ConstructorFieldInitializer node) {
+    _checkIndent(node);
+    super.visitConstructorFieldInitializer(node);
+  }
+
+  @override
+  void visitIfStatement(IfStatement node) {
+    _checkStartsLine(node);
+    _checkSpaceAfter(node.ifKeyword, 1);
+    _checkSpaceAfter(node.leftParenthesis, 0);
+    _checkSpaceBefore(node.rightParenthesis, 0);
+    _checkSpaceAfter(node.rightParenthesis, 1);
+    if (node.thenStatement is Block) {
+      _checkSpaceBefore(node.thenStatement.beginToken, 1);
+      node.thenStatement.accept(this);
+    } else {
+      _checkStartsLine(node.thenStatement);
+      _indent();
+      node.thenStatement.accept(this);
+      _unIndent();
+    }
+    if (node.elseKeyword != null) {
+      if (node.thenStatement is Block) {
+        _checkSpaceBefore(node.elseKeyword, 1);
+      } else {
+        _checkTokenStartsLine(node.elseKeyword);
       }
-      if (current is MethodInvocation &&
-          current.operator != null &&
-          _startsLine(current) &&
-          _areNotOnSameLine(current.target.offset, current.operator.offset)) {
-        column = _columnAt(current.target.offset) +
-            ((!_isOneLiner(current.target) &&
-                    _columnAt(_getRealOffset(current.target)) ==
-                        _columnAt(_startOfLine(current.target.endToken)))
-                ? 0
-                : 2);
-        break;
-      }
-      if (current is PropertyAccess &&
-          current.operator != null &&
-          _startsLine(current) &&
-          _areNotOnSameLine(current.target.offset, current.operator.offset)) {
-        column = _columnAt(current.target.offset) +
-            ((!_isOneLiner(current.target) &&
-                    _columnAt(_getRealOffset(current.target)) ==
-                        _columnAt(_startOfLine(current.target.endToken)))
-                ? 0
-                : 2);
-        break;
-      }
-      if (_startsLine(current) &&
-          _areNotOnSameLine(current.offset, offset) &&
-          (current is Statement ||
-              current is MapLiteralEntry ||
-              current is MapLiteral ||
-              current is ListLiteral ||
-              current is SetLiteral ||
-              current is NamedExpression ||
-              current is InstanceCreationExpression ||
-              current is SwitchMember ||
-              current is MethodInvocation ||
-              current is! AdjacentStrings && current?.parent is ArgumentList ||
-              current?.parent is CascadeExpression)) {
-        column = _columnAt(current.offset) + 2;
-        break;
-      }
-      if (current is ConditionalExpression &&
-          _areNotOnSameLine(current.offset, current.elseExpression.offset) &&
-          current.condition != child) {
-        column = _columnAt(child.offset) + 2;
-        break;
+      if (node.elseStatement is Block) {
+        _checkSpaceBefore(node.elseStatement.beginToken, 1);
+        node.elseStatement.accept(this);
+      } else {
+        _checkStartsLine(node.elseStatement);
+        _indent();
+        node.elseStatement.accept(this);
+        _unIndent();
       }
     }
-    return column;
   }
 
-
-  void _checkIndent(AstNode node, int offset) {
-    int column = _getBaseColumn(node, offset);
-    if (column != null) {
-      _checkLocation(offset,
-          column: column,
-          message: 'expected at column $column: ' + dumpParents(node));
-    }
+  @override
+  void visitStatement(Statement node) {
+    if (_startsLine(node)) _checkIndent(node);
+    super.visitStatement(node);
   }
 
   final _tokenAlreadyCheckedForComments = <Token>[];
@@ -295,18 +233,19 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     }
   }
 
-  int _getRealOffset(AstNode node) {
+  Token _getBeginToken(AstNode node) {
     return node is AnnotatedNode
-        ? node.firstTokenAfterCommentAndMetadata.offset
-        : node.offset;
+        ? node.firstTokenAfterCommentAndMetadata
+        : node.beginToken;
   }
 
   bool _startsLine(AstNode node) {
-    return _tokenStartsLine(node.beginToken);
+    return _tokenStartsLine(_getBeginToken(node));
   }
 
   bool _tokenStartsLine(Token token) {
     return token.previous == null ||
+        token.previous.offset == -1 ||
         !_areOnSameLine(token.offset, token.previous.end);
   }
 
@@ -321,11 +260,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   bool _isOneLiner(AstNode node) {
-    return _areOnSameLine(
-        node.end,
-        node is AnnotatedNode
-            ? node.firstTokenAfterCommentAndMetadata.offset
-            : node.offset);
+    return _areOnSameLine(_getBeginToken(node).offset, node.end);
   }
 
   bool _areNotOnSameLine(int offset1, int offset2) {
@@ -419,5 +354,27 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     } else {
       return token.previous;
     }
+  }
+
+  void _checkStartsLine(AstNode node) {
+    _checkTokenStartsLine(_getBeginToken(node));
+  }
+
+  void _checkTokenStartsLine(Token token) {
+    if (!_tokenStartsLine(token)) {
+      addError(
+        'It should start the line',
+        token.offset,
+        token.length,
+      );
+    }
+  }
+
+  void _checkIndent(AstNode node) {
+    _checkTokenIndent(_getBeginToken(node));
+  }
+
+  void _checkTokenIndent(Token token) {
+    _checkLocation(token.offset, column: _indents.last);
   }
 }
