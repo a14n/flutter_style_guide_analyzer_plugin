@@ -48,7 +48,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
       for (final statement in node.statements.skip(1)) {
         _checkSpaceBefore(statement.beginToken, 1);
       }
-      super.visitBlock(node);
+      node.visitChildren(this);
     } else if (node.rightBracket.precedingComments == null &&
         node.statements.isEmpty) {
       addError(
@@ -128,15 +128,27 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
 
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
+    _checkCommentsAndAnnotations(node);
+    _checkStartsLine(node);
+    _checkIndent(node);
+    if (node.period != null) {
+      _checkSpaceBefore(node.period, 0);
+      _checkSpaceAfter(node.period, 0);
+    }
+    _checkSpaceBefore(node.parameters.beginToken, 0);
+    node.parameters.accept(this);
+    if (node.separator != null) {
+      _checkSpaceBefore(node.separator, 1);
+      _checkSpaceAfter(node.separator, 1);
+    }
     if (node.initializers != null) {
-      if (!_isOneLiner(node)) {
-        _indent(
-            node.parameters.endToken.offset - _getBeginToken(node).offset + 2);
+      if (_isOneLiner(node) && node.initializers.length == 1) {
+        node.initializers.accept(this);
+      } else {
+        _indent(_columnAt(node.separator.offset) + 2 - _indents.last);
         node.initializers.accept(this);
         _unIndent();
       }
-    } else {
-      super.visitConstructorDeclaration(node);
     }
   }
 
@@ -152,7 +164,6 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     _checkSpaceAfter(node.ifKeyword, 1);
     _checkSpaceAfter(node.leftParenthesis, 0);
     _checkSpaceBefore(node.rightParenthesis, 0);
-    _checkSpaceAfter(node.rightParenthesis, 1);
     if (node.thenStatement is Block) {
       _checkSpaceBefore(node.thenStatement.beginToken, 1);
       node.thenStatement.accept(this);
