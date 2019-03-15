@@ -145,17 +145,19 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
       if (_isOneLiner(node) && node.initializers.length == 1) {
         node.initializers.accept(this);
       } else {
+        if (_isOneLiner(node.parameters)) {
+          _checkTokenStartsLine(node.separator);
+          _checkLocation(node.separator.offset,
+              column: _indents.last + defaultIndent);
+        }
         _indent(_columnAt(node.separator.offset) + 2 - _indents.last);
         node.initializers.accept(this);
+        node.initializers //
+            .skip(1) // to avoid redondancy with space after colon
+            .forEach(_checkIndent);
         _unIndent();
       }
     }
-  }
-
-  @override
-  void visitConstructorFieldInitializer(ConstructorFieldInitializer node) {
-    _checkIndent(node);
-    super.visitConstructorFieldInitializer(node);
   }
 
   @override
