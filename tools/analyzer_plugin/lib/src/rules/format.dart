@@ -165,7 +165,11 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
 
   @override
   void visitIfStatement(IfStatement node) {
-    _checkStartsLine(node);
+    if (node.parent is IfStatement) {
+      _checkSpaceBefore(node.beginToken, 1);
+    } else {
+      _checkStartsLine(node);
+    }
     _checkSpaceAfter(node.ifKeyword, 1);
     _checkSpaceAfter(node.leftParenthesis, 0);
     _checkSpaceBefore(node.rightParenthesis, 0);
@@ -185,7 +189,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
       } else {
         _checkTokenStartsLine(node.elseKeyword);
       }
-      if (node.elseStatement is Block) {
+      if (node.elseStatement is Block || node.elseStatement is IfStatement) {
         _checkSpaceBefore(node.elseStatement.beginToken, 1);
         node.elseStatement.accept(this);
       } else {
@@ -193,6 +197,44 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
         _indent();
         node.elseStatement.accept(this);
         _unIndent();
+      }
+    }
+    // check every if branches are block or not
+    {
+      const message = 'A block is needed.';
+      var parent = node.parent;
+      bool needBlock = node.thenStatement is Block ||
+          node.elseStatement is Block ||
+          parent is IfStatement &&
+              parent.elseStatement == node &&
+              parent.thenStatement is Block;
+      if (needBlock) {
+        if (node.thenStatement is! Block) {
+          addError(
+            message,
+            node.thenStatement.offset,
+            node.thenStatement.length,
+          );
+        }
+        if (node.elseStatement != null &&
+            node.elseStatement is! Block &&
+            node.elseStatement is! IfStatement) {
+          addError(
+            message,
+            node.elseStatement.offset,
+            node.elseStatement.length,
+          );
+        }
+        var parent = node.parent;
+        if (parent is IfStatement &&
+            parent.elseStatement == node &&
+            parent.thenStatement is! Block) {
+          addError(
+            message,
+            parent.thenStatement.offset,
+            parent.thenStatement.length,
+          );
+        }
       }
     }
   }

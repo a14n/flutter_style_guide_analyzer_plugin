@@ -25,15 +25,15 @@ test_esleExpression_indent() {
   else
      m;
 
-  if (m)
+  if (m) {
     m;
-  else {
+  } else {
     m;
   }
   // LINT +4:6
-  if (m)
+  if (m) {
     m;
-  else {
+  } else {
      m;
   }
 }
@@ -61,23 +61,25 @@ test_spaces() {
   // LINT +3:4
   if (m) {
     m;
-  }else
+  }else {
     m;
+  }
   // LINT +3:4
   if (m) {
     m;
-  }  else
-    m;
-  // LINT +3:7
-  if (m)
-    m;
-  else{
+  }  else {
     m;
   }
-  // LINT +3:7
-  if (m)
+  // LINT +3:9
+  if (m) {
     m;
-  else  {
+  } else{
+    m;
+  }
+  // LINT +3:9
+  if (m) {
+    m;
+  } else  {
     m;
   }
 
@@ -94,4 +96,48 @@ test_spaces() {
   else {
     m;
   }
+}
+test_block_consistancy() {
+  if (m)
+    m;
+  else
+    m;
+  if (m) {
+    m;
+  } else {
+    m;
+  }
+  // LINT +2:5
+  if (m)
+    m;
+  else {
+    m;
+  }
+  // LINT +4:5
+  if (m) {
+    m;
+  } else
+    m;
+
+  if (m) {
+    m;
+  } else if (m) {
+    m;
+  } else {
+    m;
+  }
+  // LINT +2:5 +6:5
+  if (m)
+    m;
+  else if (m) {
+    m;
+  } else
+    m;
+  // LINT +4:5 +6:5
+  if (m) {
+    m;
+  } else if (m)
+    m;
+  else
+    m;
 }
