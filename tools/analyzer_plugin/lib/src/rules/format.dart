@@ -425,6 +425,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
       final column = _columnAt(comment.offset);
       final isDoc = comment.lexeme.startsWith('///');
       final isEol = !isDoc &&
+          comment.lexeme.startsWith('//') &&
           comment.previous == null &&
           beginToken.previous != null &&
           _lineAt(comment.offset) == _lineAt(beginToken.previous.end);
