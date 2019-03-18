@@ -387,6 +387,28 @@ class _Visitor extends GeneralizingAstVisitor<void> {
     super.visitStatement(node);
   }
 
+  @override
+  void visitWhileStatement(WhileStatement node) {
+    if (_startsLine(node)) {
+      _checkIndent(node);
+    }
+    _checkSpaceAfter(node.whileKeyword, 1);
+    _checkSpaceAfter(node.leftParenthesis, 0);
+    _indent(4);
+    node.condition.accept(this);
+    _unIndent();
+    _checkSpaceBefore(node.rightParenthesis, 0);
+    if (node.body is Block) {
+      _checkSpaceBefore(node.body.beginToken, 1);
+      node.body.accept(this);
+    } else {
+      _indent();
+      _checkStartsLine(node.body);
+      node.body.accept(this);
+      _unIndent();
+    }
+  }
+
   final _tokenAlreadyCheckedForComments = <Token>[];
 
   void _checkComments(Token beginToken) {
