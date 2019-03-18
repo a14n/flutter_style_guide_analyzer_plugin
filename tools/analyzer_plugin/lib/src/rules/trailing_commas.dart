@@ -11,9 +11,20 @@ import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 /// There's an exception for argument list with only one element. It's allowed
 /// to not have a trailing comma. However this exception doesn't apply for
 /// constructor trees.
-class TrailingCommasRule extends Rule with RecursiveAstVisitor<void> {
+class TrailingCommasRule extends Rule {
   TrailingCommasRule(ErrorReporter addError)
       : super('trailing_commas', addError);
+
+  @override
+  void visitCompilationUnit(CompilationUnit node) {
+    _Visitor(this).visitCompilationUnit(node);
+  }
+}
+
+class _Visitor extends GeneralizingAstVisitor<void> {
+  _Visitor(this.rule);
+
+  final Rule rule;
 
   LineInfo lineInfo;
 
@@ -77,7 +88,7 @@ class TrailingCommasRule extends Rule with RecursiveAstVisitor<void> {
 
     if (list.last.endToken?.next?.type != TokenType.COMMA &&
         _lineOf(list.last.end) != _lineOf(list.owner.end)) {
-      addError(
+      rule.addError(
         'A trailing comma should end this line',
         list.last.end,
         0,

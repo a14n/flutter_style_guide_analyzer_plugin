@@ -2,12 +2,22 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
-import 'package:flutter_style_guide_analyzer_plugin/src/ast_util.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 import 'package:meta/meta.dart';
 
-class FormatRule extends Rule with GeneralizingAstVisitor<void> {
+class FormatRule extends Rule {
   FormatRule(ErrorReporter addError) : super('format', addError);
+
+  @override
+  void visitCompilationUnit(CompilationUnit node) {
+    _Visitor(this).visitCompilationUnit(node);
+  }
+}
+
+class _Visitor extends GeneralizingAstVisitor<void> {
+  _Visitor(this.rule);
+
+  final Rule rule;
 
   LineInfo lineInfo;
 
@@ -52,7 +62,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
       node.visitChildren(this);
     } else if (node.rightBracket.precedingComments == null &&
         node.statements.isEmpty) {
-      addError(
+      rule.addError(
         'Use a oneliner for empty block',
         node.leftBracket.offset,
         node.rightBracket.end - node.leftBracket.offset,
@@ -63,7 +73,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
       for (final statement in node.statements) {
         final line = _lineAt(statement.offset);
         if (lines.contains(line)) {
-          addError(
+          rule.addError(
             'This statement should be on its own line',
             statement.offset,
             statement.length,
@@ -287,7 +297,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
               parent.thenStatement is Block;
       if (needBlock) {
         if (node.thenStatement is! Block) {
-          addError(
+          rule.addError(
             message,
             node.thenStatement.offset,
             node.thenStatement.length,
@@ -296,7 +306,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
         if (node.elseStatement != null &&
             node.elseStatement is! Block &&
             node.elseStatement is! IfStatement) {
-          addError(
+          rule.addError(
             message,
             node.elseStatement.offset,
             node.elseStatement.length,
@@ -306,7 +316,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
         if (parent is IfStatement &&
             parent.elseStatement == node &&
             parent.thenStatement is! Block) {
-          addError(
+          rule.addError(
             message,
             parent.thenStatement.offset,
             parent.thenStatement.length,
@@ -322,15 +332,17 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
       _checkSpaceAfter(node.leftBracket, 0);
     } else if (_isOneLiner(node)) {
       if (node.entries.length > 1) {
-        addError('every entries should be on its own line',
+        rule.addError('every entries should be on its own line',
             node.entries.beginToken.offset, 0);
       } else {
         _checkSpaceAfter(node.leftBracket, 0);
         node.entries.accept(this);
         _checkSpaceBefore(node.rightBracket, 0);
         if (node.rightBracket.previous.type == TokenType.COMMA) {
-          addError('avoid trailing comma in a single element one liner map.',
-              node.rightBracket.previous.offset, 1);
+          rule.addError(
+              'avoid trailing comma in a single element one liner map.',
+              node.rightBracket.previous.offset,
+              1);
         }
       }
     } else {
@@ -340,7 +352,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
         _checkTokenStartsLine(token);
         _checkTokenIndent(token);
         if (entry.endToken.next.type != TokenType.COMMA) {
-          addError('Add a trailing comma.', entry.endToken.end, 0);
+          rule.addError('Add a trailing comma.', entry.endToken.end, 0);
         }
       }
       node.entries.accept(this);
@@ -400,7 +412,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
           message: '$column != ${_columnAt(beginToken.offset)}',
         );
       } else if (isEol && comment.offset - beginToken.previous.end < 1) {
-        addError(
+        rule.addError(
           'Put at least one space before end of line comments',
           beginToken.previous.end,
           comment.offset - beginToken.previous.end,
@@ -470,7 +482,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     String message,
   }) {
     if (!_isOffsetAtLocation(offset, line: line, column: column)) {
-      addError(
+      rule.addError(
         message ?? 'Bad position (expected at $line:$column)',
         offset,
         0,
@@ -499,7 +511,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     if (!_isOffsetAtLocation(token.offset,
         line: locationOfPreviousEnd.lineNumber,
         column: locationOfPreviousEnd.columnNumber + numberOfSpaces)) {
-      addError(
+      rule.addError(
         'There should be $numberOfSpaces space',
         previousToken.end,
         token.offset - previousToken.end,
@@ -518,7 +530,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     if (!_isOffsetAtLocation(nextToken.offset,
         line: locationOfEnd.lineNumber,
         column: locationOfEnd.columnNumber + numberOfSpaces)) {
-      addError(
+      rule.addError(
         'There should be $numberOfSpaces space',
         token.end,
         nextToken.offset - token.end,
@@ -549,7 +561,7 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
 
   void _checkTokenStartsLine(Token token) {
     if (!_tokenStartsLine(token)) {
-      addError(
+      rule.addError(
         'It should start the line',
         token.offset,
         token.length,
