@@ -351,7 +351,8 @@ class _Visitor extends GeneralizingAstVisitor<void> {
         final token = entry.beginToken;
         _checkTokenStartsLine(token);
         _checkTokenIndent(token);
-        if (entry.endToken.next.type != TokenType.COMMA) {
+        if (entry.endToken.next != null &&
+            entry.endToken.next.type != TokenType.COMMA) {
           rule.addError('Add a trailing comma.', entry.endToken.end, 0);
         }
       }
