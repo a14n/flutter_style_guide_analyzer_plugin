@@ -164,21 +164,47 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
   }
 
   @override
-  void visitIfStatement(IfStatement node) {
-    if (node.parent is IfStatement) {
-      _checkSpaceBefore(node.beginToken, 1);
+  void visitForEachStatement(ForEachStatement node) {
+    if (_startsLine(node)) {
+      _checkIndent(node);
+    }
+    if (node.awaitKeyword != null) {
+      _checkSpaceAfter(node.awaitKeyword, 1);
+    }
+    _checkSpaceAfter(node.forKeyword, 1);
+    _checkSpaceAfter(node.leftParenthesis, 0);
+    node.identifier?.accept(this);
+    node.loopVariable?.accept(this);
+    _checkSpaceBefore(node.inKeyword, 1);
+    _checkSpaceAfter(node.inKeyword, 1);
+    node.iterable.accept(this);
+    _checkSpaceBefore(node.rightParenthesis, 0);
+    if (node.body is Block) {
+      _checkSpaceBefore(node.body.beginToken, 1);
+      node.body.accept(this);
     } else {
-      _checkStartsLine(node);
+      _indent();
+      _checkStartsLine(node.body);
+      node.body.accept(this);
+      _unIndent();
+    }
+  }
+
+  @override
+  void visitIfStatement(IfStatement node) {
+    if (_startsLine(node)) {
+      _checkIndent(node);
     }
     _checkSpaceAfter(node.ifKeyword, 1);
     _checkSpaceAfter(node.leftParenthesis, 0);
+    node.condition.accept(this);
     _checkSpaceBefore(node.rightParenthesis, 0);
     if (node.thenStatement is Block) {
       _checkSpaceBefore(node.thenStatement.beginToken, 1);
       node.thenStatement.accept(this);
     } else {
-      _checkStartsLine(node.thenStatement);
       _indent();
+      _checkStartsLine(node.thenStatement);
       node.thenStatement.accept(this);
       _unIndent();
     }
@@ -193,8 +219,8 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
         _checkSpaceBefore(node.elseStatement.beginToken, 1);
         node.elseStatement.accept(this);
       } else {
-        _checkStartsLine(node.elseStatement);
         _indent();
+        _checkStartsLine(node.elseStatement);
         node.elseStatement.accept(this);
         _unIndent();
       }
@@ -291,7 +317,9 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
 
   @override
   void visitStatement(Statement node) {
-    if (_startsLine(node)) _checkIndent(node);
+    if (_startsLine(node)) {
+      _checkIndent(node);
+    }
     super.visitStatement(node);
   }
 
@@ -413,11 +441,11 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
   void _checkSpaceBefore(
     Token token,
     int numberOfSpaces, {
-    bool skipIfEol = false,
+    bool soft = false,
   }) {
     final previousToken = _previousToken(token);
     if (previousToken == null ||
-        skipIfEol && _areNotOnSameLine(previousToken.end, token.offset)) {
+        soft && _areNotOnSameLine(previousToken.end, token.offset)) {
       return;
     }
 
@@ -437,11 +465,11 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
   void _checkSpaceAfter(
     Token token,
     int numberOfSpaces, {
-    bool skipIfEol = false,
+    bool soft = false,
   }) {
     final nextToken = _nextToken(token);
     if (nextToken == null ||
-        skipIfEol && _areNotOnSameLine(token.end, nextToken.offset)) {
+        soft && _areNotOnSameLine(token.end, nextToken.offset)) {
       return;
     }
 
