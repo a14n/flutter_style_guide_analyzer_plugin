@@ -173,11 +173,62 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     }
     _checkSpaceAfter(node.forKeyword, 1);
     _checkSpaceAfter(node.leftParenthesis, 0);
+    _indent(4);
     node.identifier?.accept(this);
     node.loopVariable?.accept(this);
-    _checkSpaceBefore(node.inKeyword, 1);
+    if (_tokenStartsLine(node.inKeyword)) {
+      _checkTokenIndent(node.inKeyword);
+    } else {
+      _checkSpaceBefore(node.inKeyword, 1);
+    }
     _checkSpaceAfter(node.inKeyword, 1);
     node.iterable.accept(this);
+    _unIndent();
+    _checkSpaceBefore(node.rightParenthesis, 0);
+    if (node.body is Block) {
+      _checkSpaceBefore(node.body.beginToken, 1);
+      node.body.accept(this);
+    } else {
+      _indent();
+      _checkStartsLine(node.body);
+      node.body.accept(this);
+      _unIndent();
+    }
+  }
+
+  @override
+  void visitForStatement(ForStatement node) {
+    if (_startsLine(node)) {
+      _checkIndent(node);
+    }
+    _checkSpaceAfter(node.forKeyword, 1);
+    _checkSpaceAfter(node.leftParenthesis, 0);
+    _indent(4);
+    node.initialization?.accept(this);
+    node.variables?.accept(this);
+    _checkSpaceBefore(node.leftSeparator, 0);
+    if (node.condition != null) {
+      if (_startsLine(node.condition)) {
+        _checkIndent(node.condition);
+      } else {
+        _checkSpaceAfter(node.leftSeparator, 1);
+      }
+    } else {
+      _checkSpaceAfter(node.leftSeparator, 0);
+    }
+    node.condition?.accept(this);
+    _checkSpaceBefore(node.rightSeparator, 0);
+    if (node.updaters.isNotEmpty) {
+      if (_tokenStartsLine(node.updaters.beginToken)) {
+        _checkTokenIndent(node.updaters.beginToken);
+      } else {
+        _checkSpaceAfter(node.rightSeparator, 1);
+      }
+    } else {
+      _checkSpaceAfter(node.rightSeparator, 0);
+    }
+    node.updaters.accept(this);
+    _unIndent();
     _checkSpaceBefore(node.rightParenthesis, 0);
     if (node.body is Block) {
       _checkSpaceBefore(node.body.beginToken, 1);
@@ -438,14 +489,9 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
         column == location.columnNumber;
   }
 
-  void _checkSpaceBefore(
-    Token token,
-    int numberOfSpaces, {
-    bool soft = false,
-  }) {
+  void _checkSpaceBefore(Token token, int numberOfSpaces) {
     final previousToken = _previousToken(token);
-    if (previousToken == null ||
-        soft && _areNotOnSameLine(previousToken.end, token.offset)) {
+    if (previousToken == null) {
       return;
     }
 
@@ -462,14 +508,9 @@ class FormatRule extends Rule with GeneralizingAstVisitor<void> {
     }
   }
 
-  void _checkSpaceAfter(
-    Token token,
-    int numberOfSpaces, {
-    bool soft = false,
-  }) {
+  void _checkSpaceAfter(Token token, int numberOfSpaces) {
     final nextToken = _nextToken(token);
-    if (nextToken == null ||
-        soft && _areNotOnSameLine(token.end, nextToken.offset)) {
+    if (nextToken == null) {
       return;
     }
 

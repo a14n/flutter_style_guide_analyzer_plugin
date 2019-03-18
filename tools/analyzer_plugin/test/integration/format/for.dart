@@ -1,16 +1,16 @@
 var m;
 test_indent() {
-  for (var _ in m)
+  for (var _; m; m)
     m;
   // LINT +2:6
-  for (var _ in m)
+  for (var _; m; m)
      m;
 
-  for (var _ in m) {
+  for (var _; m; m) {
     m;
   }
   // LINT +2:6
-  for (var _ in m) {
+  for (var _; m; m) {
      m;
   }
 }
@@ -40,23 +40,26 @@ test_spaces() async {
   }
 }
 test_wrap() async {
-  for (var _
-      in m)
+  for (var _;
+      m; m)
     m;
-  // LINT :16
-  for (var _ in
+  for (var _; m;
+      m)
+    m;
+  for (var _;
+      m;
       m)
     m;
   // LINT :8
   for (
-      var _ in m)
+      var _; m; m)
     m;
-  // LINT +2:8
+  // LINT :13
   for (var _
-       in m)
+      ; m; m)
     m;
-  // LINT +2:6
-  for (var _
-     in m)
+  // LINT :16
+  for (var _; m
+      ; m)
     m;
 }
