@@ -366,7 +366,14 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   void visitMapLiteralEntry(MapLiteralEntry node) {
     node.key.accept(this);
     _checkSpaceBefore(node.separator, 0);
-    if (_areOnSameLine(node.separator.offset, node.value.offset)) {
+    final MapLiteral parent = node.parent;
+    final hasSiblingsWithAlignedValues = parent.entries.length > 1 &&
+        parent.entries.every((e) => _isOneLiner(e)) &&
+        parent.entries.map((e) => _columnAt(e.value.offset)).toSet().length ==
+            1;
+    if (hasSiblingsWithAlignedValues) {
+      node.value.accept(this);
+    } else if (_areOnSameLine(node.separator.offset, node.value.offset)) {
       _checkSpaceAfter(node.separator, 1);
       node.value.accept(this);
     } else {
