@@ -96,7 +96,42 @@ test_spaces() {
   else {
     m;
   }
+
+  // allow multi-line condition on its own lines but with block
+  if (
+    m &&
+    m
+  ) {
+    m;
+  }
+  // LINT :7 +2:6
+  if (
+    m
+  ) {
+    m;
+  }
+  // LINT +5:5
+  if (
+    m &&
+    m
+  )
+    m;
+  // LINT +2:6
+  if (
+     m &&
+     m
+  ) {
+    m;
+  }
+  // LINT +2:4
+  if (
+   m &&
+   m
+  ) {
+    m;
+  }
 }
+
 test_block_consistancy() {
   if (m)
     m;

@@ -257,9 +257,12 @@ class _Visitor extends GeneralizingAstVisitor<void> {
       _checkIndent(node);
     }
     _checkSpaceAfter(node.ifKeyword, 1);
-    _checkSpaceAfter(node.leftParenthesis, 0);
-    node.condition.accept(this);
-    _checkSpaceBefore(node.rightParenthesis, 0);
+    _visitCondition(
+      node.leftParenthesis,
+      node.condition,
+      node.rightParenthesis,
+      node.thenStatement,
+    );
     if (node.thenStatement is Block) {
       _checkSpaceBefore(node.thenStatement.beginToken, 1);
       node.thenStatement.accept(this);
@@ -413,6 +416,31 @@ class _Visitor extends GeneralizingAstVisitor<void> {
       _checkStartsLine(node.body);
       node.body.accept(this);
       _unIndent();
+    }
+  }
+
+  void _visitCondition(
+    Token leftParenthesis,
+    Expression condition,
+    Token rightParenthesis, [
+    Statement expectedBlock,
+  ]) {
+    if (_startsLine(condition) &&
+        _areNotOnSameLine(condition.offset, condition.end)) {
+      _indent();
+      _checkIndent(condition);
+      condition.accept(this);
+      _unIndent();
+      _checkTokenStartsLine(rightParenthesis);
+      _checkTokenIndent(rightParenthesis);
+      if (expectedBlock != null && expectedBlock is! Block) {
+        rule.addError('This should be wrap into a block', expectedBlock.offset,
+            expectedBlock.length);
+      }
+    } else {
+      _checkSpaceAfter(leftParenthesis, 0);
+      condition.accept(this);
+      _checkSpaceBefore(rightParenthesis, 0);
     }
   }
 
