@@ -388,8 +388,76 @@ class _Visitor extends GeneralizingAstVisitor<void> {
       node.value.accept(this);
       _unIndent();
     }
-    if (node.endToken.next.type == TokenType.COMMA) {
+    if (node.endToken.next?.type == TokenType.COMMA) {
       _checkSpaceAfter(node.endToken, 0);
+    }
+  }
+
+  @override
+  void visitFormalParameterList(FormalParameterList node) {
+    if (node.parameters.isEmpty &&
+        node.rightParenthesis.precedingComments == null) {
+      _checkSpaceAfter(node.leftParenthesis, 0);
+      return;
+    }
+
+    if (node.leftDelimiter != null) {
+      if (node.parameters.every((e) => e.isOptional)) {
+        _checkSpaceAfter(node.leftParenthesis, 0);
+      } else {
+        _checkSpaceAfter(node.leftDelimiter.previous, 1);
+      }
+    }
+    if (node.rightDelimiter != null) {
+      _checkSpaceAfter(node.rightDelimiter, 0);
+    }
+    for (final parameter in node.parameters) {
+      if (parameter.endToken.next.type == TokenType.COMMA) {
+        _checkSpaceAfter(parameter.endToken, 0);
+      }
+    }
+    if (_isOneLiner(node)) {
+      for (final parameter in node.parameters) {
+        parameter.accept(this);
+        if (parameter.beginToken.previous.type == TokenType.COMMA) {
+          _checkSpaceBefore(parameter.beginToken, 1);
+        }
+      }
+      if (node.parameters.isNotEmpty &&
+          node.parameters.last.endToken.next.type == TokenType.COMMA) {
+        rule.addError(
+          'No trailing comma for one liner parameters',
+          node.parameters.last.endToken.next.offset,
+          1,
+        );
+      }
+      if (node.leftDelimiter != null) {
+        _checkSpaceAfter(node.leftDelimiter, 1);
+        _checkSpaceBefore(node.rightDelimiter, 1);
+      }
+    } else {
+      _indent();
+      for (final parameter in node.parameters) {
+        _checkStartsLine(parameter);
+        _checkIndent(parameter);
+        parameter.accept(this);
+        if (parameter.endToken.next?.type != TokenType.COMMA) {
+          rule.addError(
+            'This parameter should be followed by a comma.',
+            parameter.end,
+            1,
+          );
+        }
+      }
+      _unIndent();
+      if (node.rightDelimiter != null) {
+        _checkTokenStartsLine(node.rightDelimiter);
+        _checkTokenIndent(node.rightDelimiter);
+        _checkSpaceAfter(node.rightDelimiter, 0);
+      } else {
+        _checkTokenStartsLine(node.rightParenthesis);
+        _checkTokenIndent(node.rightParenthesis);
+      }
     }
   }
 
