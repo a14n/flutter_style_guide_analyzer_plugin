@@ -148,13 +148,15 @@ class _Visitor extends GeneralizingAstVisitor<void> {
     }
     _checkSpaceBefore(node.parameters.beginToken, 0);
     node.parameters.accept(this);
-    if (node.separator != null) {
+    if (node.separator?.type == TokenType.COLON) {
       if (_areOnSameLine(node.separator.offset, node.parameters.end)) {
         _checkSpaceBefore(node.separator, 1);
       }
       _checkSpaceAfter(node.separator, 1);
       if (node.initializers != null) {
-        if (_isOneLiner(node) && node.initializers.length == 1) {
+        if (node.initializers.length == 1 &&
+            _areOnSameLine(
+                _getBeginToken(node).offset, node.initializers.endToken.end)) {
           node.initializers.accept(this);
         } else {
           if (_isOneLiner(node.parameters)) {

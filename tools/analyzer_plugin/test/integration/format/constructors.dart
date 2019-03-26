@@ -41,5 +41,9 @@ class Initializers {
   // LINT :22 :34
   Initializers._5b() : a = true, super();
 
+  Initializers._6() : super() {
+    //
+  }
+
   var a, b, c;
 }
