@@ -9,12 +9,10 @@ f() {
   m = {
   };
 
-  // one liner only with one element
+  // one liner without trailing comma
   m = {'a': 1};
   // LINT :14
   m = {'a': 1,};
-  // LINT :8
-  m = {'a': 1, 'b': 2};
 
   // spaces in one liner
   m = {'a': 1};
@@ -71,5 +69,14 @@ f() {
     'a':  1,
     'aa':  1,
     'aaa': 1,
+  };
+
+  // check type argument separation
+  m = <String, int>{
+    'a': 1,
+  };
+  // LINT :20
+  m = <String, int> {
+    'a': 1,
   };
 }

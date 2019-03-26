@@ -333,22 +333,24 @@ class _Visitor extends GeneralizingAstVisitor<void> {
 
   @override
   void visitMapLiteral(MapLiteral node) {
+    if (node.typeArguments != null) {
+      _checkSpaceAfter(node.typeArguments.endToken, 0);
+      node.typeArguments.accept(this);
+    }
     if (node.rightBracket.precedingComments == null && node.entries.isEmpty) {
       _checkSpaceAfter(node.leftBracket, 0);
     } else if (_isOneLiner(node)) {
+      _checkSpaceAfter(node.leftBracket, 0);
+      node.entries.accept(this);
+      _checkSpaceBefore(node.rightBracket, 0);
       if (node.entries.length > 1) {
-        rule.addError('every entries should be on its own line',
-            node.entries.beginToken.offset, 0);
-      } else {
-        _checkSpaceAfter(node.leftBracket, 0);
-        node.entries.accept(this);
-        _checkSpaceBefore(node.rightBracket, 0);
-        if (node.rightBracket.previous.type == TokenType.COMMA) {
-          rule.addError(
-              'avoid trailing comma in a single element one liner map.',
-              node.rightBracket.previous.offset,
-              1);
+        for (final entry in node.entries.skip(1)) {
+          _checkSpaceBefore(entry.beginToken, 1);
         }
+      }
+      if (node.rightBracket.previous.type == TokenType.COMMA) {
+        rule.addError('avoid trailing comma in a single element one liner map.',
+            node.rightBracket.previous.offset, 1);
       }
     } else {
       _indent();
