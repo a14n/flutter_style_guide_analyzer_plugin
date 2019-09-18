@@ -42,25 +42,13 @@ class _Visitor extends GeneralizingAstVisitor<void> {
 
   @override
   void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
-    if (node.argumentList.arguments.length > 1)
-      _visitNodeList(node.argumentList.arguments);
+    _visitNodeList(node.argumentList.arguments);
     super.visitFunctionExpressionInvocation(node);
   }
 
   @override
   void visitInstanceCreationExpression(InstanceCreationExpression node) {
-    if (node.argumentList.arguments.length > 1) {
-      _visitNodeList(node.argumentList.arguments);
-    } else if (node.argumentList.arguments.length == 1) {
-      var arg = node.argumentList.arguments.first;
-      if (arg is NamedExpression) arg = (arg as NamedExpression).expression;
-      if (arg is InstanceCreationExpression &&
-          arg.argumentList.arguments.isNotEmpty &&
-          arg.argumentList.arguments.last.endToken?.next?.type ==
-              TokenType.COMMA) {
-        _visitNodeList(node.argumentList.arguments);
-      }
-    }
+    _visitNodeList(node.argumentList.arguments);
     super.visitInstanceCreationExpression(node);
   }
 
@@ -71,15 +59,14 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
-  void visitMapLiteral(MapLiteral node) {
-    _visitNodeList(node.entries);
-    super.visitMapLiteral(node);
+  void visitSetOrMapLiteral(SetOrMapLiteral node) {
+    _visitNodeList(node.elements);
+    super.visitSetOrMapLiteral(node);
   }
 
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    if (node.argumentList.arguments.length > 1)
-      _visitNodeList(node.argumentList.arguments);
+    _visitNodeList(node.argumentList.arguments);
     super.visitMethodInvocation(node);
   }
 

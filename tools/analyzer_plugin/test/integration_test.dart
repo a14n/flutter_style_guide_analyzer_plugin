@@ -118,7 +118,6 @@ analyzer:
     }
   }
 
-        print(errorsPerFile);
   for (var entry in errorsPerFile.entries) {
     final file = entry.key;
     final errors = entry.value;
