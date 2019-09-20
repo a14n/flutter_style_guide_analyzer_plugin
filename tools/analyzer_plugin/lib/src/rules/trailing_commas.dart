@@ -71,7 +71,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   }
 
   void _visitNodeList<T extends AstNode>(NodeList<T> list) {
-    if (list.isEmpty) return;
+    if (list.length <= 1) return;
 
     if (list.last.endToken?.next?.type != TokenType.COMMA &&
         _lineOf(list.last.end) != _lineOf(list.owner.end)) {
