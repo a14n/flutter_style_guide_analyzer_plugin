@@ -35,21 +35,15 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitArgumentList(ArgumentList node) {
+    _visitNodeList(node.arguments);
+    super.visitArgumentList(node);
+  }
+
+  @override
   void visitFormalParameterList(FormalParameterList node) {
     _visitNodeList(node.parameters);
     super.visitFormalParameterList(node);
-  }
-
-  @override
-  void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
-    _visitNodeList(node.argumentList.arguments);
-    super.visitFunctionExpressionInvocation(node);
-  }
-
-  @override
-  void visitInstanceCreationExpression(InstanceCreationExpression node) {
-    _visitNodeList(node.argumentList.arguments);
-    super.visitInstanceCreationExpression(node);
   }
 
   @override
@@ -62,12 +56,6 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   void visitSetOrMapLiteral(SetOrMapLiteral node) {
     _visitNodeList(node.elements);
     super.visitSetOrMapLiteral(node);
-  }
-
-  @override
-  void visitMethodInvocation(MethodInvocation node) {
-    _visitNodeList(node.argumentList.arguments);
-    super.visitMethodInvocation(node);
   }
 
   void _visitNodeList<T extends AstNode>(NodeList<T> list) {
