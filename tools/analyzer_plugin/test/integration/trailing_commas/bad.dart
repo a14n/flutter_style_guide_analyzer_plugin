@@ -1,5 +1,7 @@
-// LINT :15
-f(int a, int b
+// LINT +3:8
+f(
+  int a,
+  int b
 ){
 }
 
