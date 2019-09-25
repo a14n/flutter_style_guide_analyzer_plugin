@@ -94,7 +94,7 @@ analyzer:
   final counts = Map.fromIterable(errorsPerFile.entries,
       key: (e) => e.key, value: (_) => 0);
   var responses = server.stdout
-      .timeout(const Duration(seconds: 30), onTimeout: (_) => server.kill())
+      .timeout(const Duration(minutes: 1), onTimeout: (_) => server.kill())
       .map(utf8.decode)
       .map((e) => e.trim())
       .where((e) => e.isNotEmpty)
