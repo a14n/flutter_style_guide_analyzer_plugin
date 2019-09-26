@@ -2,7 +2,7 @@ name: flutter_style_guide_analyzer_plugin
 version: 0.0.0
 description: Self-loader of the plugin.
 environment:
-  sdk: '>=2.0.0 <3.0.0'
+  sdk: '>=2.2.0 <3.0.0'
 dependencies:
   analyzer_plugin: 0.1.0
 dev_dependencies:
