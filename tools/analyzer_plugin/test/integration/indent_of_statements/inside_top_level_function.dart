@@ -1,7 +1,7 @@
 f1() {
   // OK
   null;
-  // LINT :3
+  // LINT :4
    null;
   // LINT :2
  null;
@@ -12,7 +12,7 @@ f2(
 ) {
   // OK
   null;
-  // LINT :3
+  // LINT :4
    null;
   // LINT :2
  null;
@@ -23,7 +23,7 @@ f3(
 ) async {
   // OK
   null;
-  // LINT :3
+  // LINT :4
    null;
   // LINT :2
  null;

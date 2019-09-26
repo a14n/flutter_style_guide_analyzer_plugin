@@ -2,7 +2,7 @@ class A{
   m1() {
     // OK
     null;
-    // LINT :5
+    // LINT :6
      null;
     // LINT :4
    null;
@@ -13,7 +13,7 @@ class A{
   ) {
     // OK
     null;
-    // LINT :5
+    // LINT :6
      null;
     // LINT :4
    null;
@@ -24,7 +24,7 @@ class A{
   ) async {
     // OK
     null;
-    // LINT :5
+    // LINT :6
      null;
     // LINT :4
    null;

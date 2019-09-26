@@ -2,12 +2,12 @@ f1() {
   b
     ? () {
         null;
-        // LINT :9
+        // LINT :10
          null;
       }
     : () {
         null;
-        // LINT :9
+        // LINT :10
          null;
       };
 }

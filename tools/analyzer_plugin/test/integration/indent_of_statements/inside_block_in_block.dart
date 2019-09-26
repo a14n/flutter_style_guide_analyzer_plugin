@@ -1,7 +1,7 @@
 f1() {
   {
     null;
-    // LINT :5
+    // LINT :6
      null;
   }
 }

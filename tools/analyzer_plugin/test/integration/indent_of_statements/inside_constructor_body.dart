@@ -2,7 +2,7 @@ class A{
   A() {
     // OK
     null;
-    // LINT :5
+    // LINT :6
      null;
     // LINT :4
    null;
@@ -10,7 +10,7 @@ class A{
   A.m1() : super() {
     // OK
     null;
-    // LINT :5
+    // LINT :6
      null;
     // LINT :4
    null;
@@ -19,7 +19,7 @@ class A{
       : super() {
     // OK
     null;
-    // LINT :5
+    // LINT :6
      null;
     // LINT :4
    null;

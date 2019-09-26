@@ -104,36 +104,26 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   }
 
   void _checkIndent(AstNode node) {
-    if (locationHelper.startsLine(node)) {
-      final expectedIndent = indent +
-          (indentStack.isEmpty
-              ? 1
-              : locationHelper.columnAt(indentStack.last.offset));
-      final stmtIndent = locationHelper.columnAt(node.offset);
-      final message = 'Indent issue (currently at $stmtIndent '
-          'but should be at $expectedIndent), ${indentStack.map((e) => "${locationHelper.lineAt(e.offset)},${locationHelper.columnAt(e.offset)}").join('+')} / ${dumpParents(node)}';
-      if (expectedIndent < stmtIndent) {
-        final offset = node.offset - (stmtIndent - expectedIndent);
-        rule.addError(
-          message,
-          offset,
-          stmtIndent - expectedIndent,
-          fixMessage: 'Indent correctly',
-          edits: [
-            SourceEdit(offset, stmtIndent - expectedIndent, ''),
-          ],
-        );
-      } else if (expectedIndent > stmtIndent) {
-        rule.addError(
-          message,
-          node.offset,
-          0,
-          fixMessage: 'Indent correctly',
-          edits: [
-            SourceEdit(node.offset, 0, ' ' * (expectedIndent - stmtIndent)),
-          ],
-        );
-      }
+    if (!locationHelper.startsLine(node)) {
+      return;
+    }
+
+    final expected = indent +
+        (indentStack.isEmpty
+            ? 1
+            : locationHelper.columnAt(indentStack.last.offset));
+    final current = locationHelper.columnAt(node.offset);
+    final message = 'Indent issue (currently at $current '
+        'but should be at $expected)'
+        '';
+    //', ${indentStack.map((e) => "${locationHelper.lineAt(e.offset)},${locationHelper.columnAt(e.offset)}").join('+')} / ${dumpParents(node)}';
+
+    if (expected != current) {
+      rule.addError(
+        message,
+        node.offset,
+        0,
+      );
     }
   }
 }
