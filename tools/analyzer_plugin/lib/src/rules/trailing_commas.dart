@@ -3,6 +3,7 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
+import 'package:flutter_style_guide_analyzer_plugin/src/ast_util.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 
 /// Ensure a trailing comma is used if the last parameter/argument in list is
@@ -36,7 +37,23 @@ class _Visitor extends GeneralizingAstVisitor<void> {
 
   @override
   void visitArgumentList(ArgumentList node) {
-    _visitNodeList(node.arguments);
+    if (node.arguments.length == 1) {
+      final arg = node.arguments.first;
+
+      if (_lineOf(arg.offset) != _lineOf(arg.end)) {
+        final lastLine = _lineOf(arg.end);
+        // find last token of previous line
+        var token = arg.endToken;
+        while (_lineOf(token.offset) == lastLine) {
+          token = token.previous;
+        }
+        if (token.type == TokenType.COMMA) {
+          _visitNodeList(node.arguments);
+        }
+      }
+    } else if (node.arguments.length > 1) {
+      _visitNodeList(node.arguments);
+    }
     super.visitArgumentList(node);
   }
 
@@ -59,9 +76,9 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   }
 
   void _visitNodeList<T extends AstNode>(NodeList<T> list) {
-    if (list.length <= 1) return;
+    if (list.isEmpty) return;
 
-    if (list.last.endToken?.next?.type != TokenType.COMMA &&
+    if (!_hasTrailingComma(list) &&
         _lineOf(list.last.end) != _lineOf(list.owner.end)) {
       rule.addError(
         'A trailing comma should end this line',
@@ -72,6 +89,9 @@ class _Visitor extends GeneralizingAstVisitor<void> {
       );
     }
   }
+
+  bool _hasTrailingComma<T extends AstNode>(NodeList<T> list) =>
+      list.isNotEmpty && list.last.endToken?.next?.type == TokenType.COMMA;
 
   int _lineOf(int offset) => lineInfo.getLocation(offset).lineNumber;
 }
