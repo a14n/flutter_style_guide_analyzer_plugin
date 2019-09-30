@@ -86,8 +86,35 @@ class _Visitor extends GeneralizingAstVisitor<void> {
     _indentAtToken(
       locationHelper.tokenStartingLine(node.beginToken),
       () {
-        // TODO dans le cas des Maps, on autorise une indentation supérieure uniquement si tous les éléments sont alignés niveau colon
-        node.elements.forEach(_checkIndent);
+        // we allow map entry to have greater indent if it allows to align colons
+        //
+        //     map = {
+        //        50: true,
+        //       100: false,
+        //     }
+        if (node.elements.length > 1 &&
+            node.elements.every((e) => e is MapLiteralEntry) &&
+            node.elements
+                    .whereType<MapLiteralEntry>()
+                    .map((e) => e.separator.offset)
+                    .map(locationHelper.columnAt)
+                    .toSet()
+                    .length ==
+                1) {
+          var ok = true;
+          for (final element in node.elements) {
+            ok &= _checkIndent(element, allowGreater: true);
+          }
+          if (!ok) {
+            _checkIndent((node.elements.toList()
+                  ..sort((e1, e2) =>
+                      locationHelper.columnAt(e1.offset) -
+                      locationHelper.columnAt(e2.offset)))
+                .first);
+          }
+        } else {
+          node.elements.forEach(_checkIndent);
+        }
         super.visitSetOrMapLiteral(node);
       },
     );
@@ -124,27 +151,43 @@ class _Visitor extends GeneralizingAstVisitor<void> {
     }
   }
 
-  void _checkIndent(AstNode node) {
+  bool _checkIndent(
+    AstNode node, {
+    bool allowGreater,
+    bool emitError,
+  }) {
+    allowGreater ??= false;
+    emitError ??= true;
+
     if (!locationHelper.startsLine(node)) {
-      return;
+      return true;
     }
 
-    final expected = indentSize +
-        (indentStack.isEmpty
-            ? 1
-            : locationHelper.columnAt(indentStack.last.offset));
+    var ref = 1;
+    if (indentStack.isNotEmpty) {
+      ref = locationHelper.columnAt(indentStack.last.offset);
+    }
+    final expected = indentSize + ref;
     final current = locationHelper.columnAt(node.offset);
-    final message = 'Indent issue (currently at $current '
-        'but should be at $expected)'
-        '';
-    //', ${indentStack.map((e) => "${locationHelper.lineAt(e.offset)},${locationHelper.columnAt(e.offset)}").join('+')} / ${dumpParents(node)}';
 
-    if (expected != current) {
-      rule.addError(
-        message,
-        node.offset,
-        0,
-      );
+    if (allowGreater && current < expected ||
+        !allowGreater && expected != current) {
+      if (emitError) {
+        var message = 'Indent issue (currently at $current but should be ';
+        if (allowGreater) {
+          message += 'at least ';
+        }
+        message += 'at $expected)';
+        message +=
+            ', ${indentStack.map((e) => "${locationHelper.lineAt(e.offset)},${locationHelper.columnAt(e.offset)}").join('+')} / ${dumpParents(node)}';
+        rule.addError(
+          message,
+          node.offset,
+          0,
+        );
+      }
+      return false;
     }
+    return true;
   }
 }
