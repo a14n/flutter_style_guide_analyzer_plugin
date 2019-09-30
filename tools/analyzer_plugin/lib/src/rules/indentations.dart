@@ -25,6 +25,8 @@ class _Visitor extends GeneralizingAstVisitor<void> {
 
   final indentStack = <Token>[];
 
+  final ignoredNodes = <AstNode>[];
+
   @override
   void visitCompilationUnit(CompilationUnit node) {
     locationHelper = LocationHelper(node.lineInfo);
@@ -37,6 +39,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
         locationHelper.lineAt(node.question.offset)) {
       _indentAtToken(
         node.thenExpression.beginToken,
+        node,
         () => node.thenExpression.accept(this),
       );
     }
@@ -44,6 +47,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
         locationHelper.lineAt(node.colon.offset)) {
       _indentAtToken(
         node.elseExpression.beginToken,
+        node,
         () => node.elseExpression.accept(this),
       );
     }
@@ -55,6 +59,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
     if (locationHelper.tokenStartsLine(constDeclaration.separator)) {
       _indentAtToken(
         node.beginToken,
+        node,
         () => super.visitConstructorInitializer(node),
       );
     } else {
@@ -63,10 +68,63 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   }
 
   @override
+  void visitForElement(ForElement node) {
+    _indentAtToken(
+      locationHelper.tokenStartingLine(node.beginToken),
+      node,
+      () {
+        // special case for spread literal
+        //
+        //     [
+        //       for (var i in list) ...<String>[
+        //         1,
+        //         2,
+        //       ]
+        //     ]
+        final ignored = [node.body]
+            .whereType<SpreadElement>()
+            .map((e) => e.expression)
+            .where((e) => e is ListLiteral || e is SetOrMapLiteral)
+            .toList();
+        ignored.forEach(ignoredNodes.add);
+        super.visitForElement(node);
+        ignored.forEach(ignoredNodes.remove);
+      },
+    );
+  }
+
+  @override
   void visitFunctionExpression(FunctionExpression node) {
     _indentAtToken(
       locationHelper.tokenStartingLine(node.beginToken),
+      node,
       () => super.visitFunctionExpression(node),
+    );
+  }
+
+  @override
+  void visitIfElement(IfElement node) {
+    _indentAtToken(
+      locationHelper.tokenStartingLine(node.beginToken),
+      node,
+      () {
+        // special case for spread literal
+        //
+        //     [
+        //       if (true) ...<String>[
+        //         1,
+        //         2,
+        //       ]
+        //     ]
+        final ignored = [node.thenElement, node.elseElement]
+            .whereType<SpreadElement>()
+            .map((e) => e.expression)
+            .where((e) => e is ListLiteral || e is SetOrMapLiteral)
+            .toList();
+        ignored.forEach(ignoredNodes.add);
+        super.visitIfElement(node);
+        ignored.forEach(ignoredNodes.remove);
+      },
     );
   }
 
@@ -74,6 +132,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   void visitListLiteral(ListLiteral node) {
     _indentAtToken(
       locationHelper.tokenStartingLine(node.beginToken),
+      node,
       () {
         node.elements.forEach(_checkIndent);
         super.visitListLiteral(node);
@@ -85,6 +144,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   void visitSetOrMapLiteral(SetOrMapLiteral node) {
     _indentAtToken(
       locationHelper.tokenStartingLine(node.beginToken),
+      node,
       () {
         // we allow map entry to have greater indent if it allows to align colons
         //
@@ -136,13 +196,14 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   }
 
   void _indentAtNode(AstNode node, void Function() f) {
-    _indentAtToken(getBeginToken(node), f);
+    _indentAtToken(getBeginToken(node), node, f);
   }
 
-  void _indentAtToken(Token token, void Function() f) {
-    if (indentStack.isNotEmpty &&
-        locationHelper.lineAt(token.offset) <=
-            locationHelper.lineAt(indentStack.last.offset)) {
+  void _indentAtToken(Token token, AstNode node, void Function() f) {
+    if (ignoredNodes.contains(node) ||
+        indentStack.isNotEmpty &&
+            locationHelper.lineAt(token.offset) <=
+                locationHelper.lineAt(indentStack.last.offset)) {
       f();
     } else {
       indentStack.add(token);
