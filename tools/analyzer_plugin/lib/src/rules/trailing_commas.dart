@@ -3,7 +3,6 @@ import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
-import 'package:flutter_style_guide_analyzer_plugin/src/ast_util.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 
 /// Ensure a trailing comma is used if the last parameter/argument in list is

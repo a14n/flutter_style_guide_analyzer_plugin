@@ -7,9 +7,8 @@ import 'package:flutter_style_guide_analyzer_plugin/src/checker.dart';
 const indentSize = 2;
 
 /// Ensure statements are indented with the same length.
-class IndentOfStatementsRule extends Rule {
-  IndentOfStatementsRule(ErrorReporter addError)
-      : super('indent_of_statements', addError);
+class IndentationsRule extends Rule {
+  IndentationsRule(ErrorReporter addError) : super('indentations', addError);
 
   @override
   void visitCompilationUnit(CompilationUnit node) {
@@ -36,14 +35,14 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   void visitConditionalExpression(ConditionalExpression node) {
     if (locationHelper.lineAt(node.offset) !=
         locationHelper.lineAt(node.question.offset)) {
-      indentAtToken(
+      _indentAtToken(
         node.thenExpression.beginToken,
         () => node.thenExpression.accept(this),
       );
     }
     if (locationHelper.lineAt(node.question.offset) !=
         locationHelper.lineAt(node.colon.offset)) {
-      indentAtToken(
+      _indentAtToken(
         node.elseExpression.beginToken,
         () => node.elseExpression.accept(this),
       );
@@ -54,7 +53,7 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   void visitConstructorInitializer(ConstructorInitializer node) {
     final constDeclaration = node.parent as ConstructorDeclaration;
     if (locationHelper.tokenStartsLine(constDeclaration.separator)) {
-      indentAtToken(
+      _indentAtToken(
         node.beginToken,
         () => super.visitConstructorInitializer(node),
       );
@@ -65,16 +64,39 @@ class _Visitor extends GeneralizingAstVisitor<void> {
 
   @override
   void visitFunctionExpression(FunctionExpression node) {
-    indentAtToken(
+    _indentAtToken(
       locationHelper.tokenStartingLine(node.beginToken),
       () => super.visitFunctionExpression(node),
     );
   }
 
   @override
+  void visitListLiteral(ListLiteral node) {
+    _indentAtToken(
+      locationHelper.tokenStartingLine(node.beginToken),
+      () {
+        node.elements.forEach(_checkIndent);
+        super.visitListLiteral(node);
+      },
+    );
+  }
+
+  @override
+  void visitSetOrMapLiteral(SetOrMapLiteral node) {
+    _indentAtToken(
+      locationHelper.tokenStartingLine(node.beginToken),
+      () {
+        // TODO dans le cas des Maps, on autorise une indentation supérieure uniquement si tous les éléments sont alignés niveau colon
+        node.elements.forEach(_checkIndent);
+        super.visitSetOrMapLiteral(node);
+      },
+    );
+  }
+
+  @override
   void visitStatement(Statement node) {
     _checkIndent(node);
-    indentAtNode(
+    _indentAtNode(
       node.thisOrAncestorMatching((e) => locationHelper.startsLine(e)),
       () => super.visitStatement(node),
     );
@@ -83,14 +105,14 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   @override
   void visitSwitchMember(SwitchMember node) {
     _checkIndent(node);
-    indentAtNode(node, () => super.visitSwitchMember(node));
+    _indentAtNode(node, () => super.visitSwitchMember(node));
   }
 
-  void indentAtNode(AstNode node, void Function() f) {
-    indentAtToken(getBeginToken(node), f);
+  void _indentAtNode(AstNode node, void Function() f) {
+    _indentAtToken(getBeginToken(node), f);
   }
 
-  void indentAtToken(Token token, void Function() f) {
+  void _indentAtToken(Token token, void Function() f) {
     if (indentStack.isNotEmpty &&
         locationHelper.lineAt(token.offset) <=
             locationHelper.lineAt(indentStack.last.offset)) {

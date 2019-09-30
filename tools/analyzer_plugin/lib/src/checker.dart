@@ -2,7 +2,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart';
 import 'package:analyzer_plugin/protocol/protocol_generated.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/rules/empty_line_at_eof.dart';
-import 'package:flutter_style_guide_analyzer_plugin/src/rules/indent_of_statements.dart';
+import 'package:flutter_style_guide_analyzer_plugin/src/rules/indentations.dart';
 import 'package:flutter_style_guide_analyzer_plugin/src/rules/trailing_commas.dart';
 
 Map<AnalysisError, PrioritizedSourceChange> check(CompilationUnit unit) {
@@ -49,8 +49,8 @@ Map<AnalysisError, PrioritizedSourceChange> check(CompilationUnit unit) {
 
   final rules = [
     EmptyLineAtEOFRule(addError),
+    IndentationsRule(addError),
     TrailingCommasRule(addError),
-    IndentOfStatementsRule(addError),
   ];
   for (final rule in rules) {
     rule.visitCompilationUnit(unit);
