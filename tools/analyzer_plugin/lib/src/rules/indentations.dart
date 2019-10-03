@@ -28,6 +28,24 @@ class _Visitor extends GeneralizingAstVisitor<void> {
   final ignoredNodes = <AstNode>[];
 
   @override
+  void visitClassMember(ClassMember node) {
+    _indentAtToken(
+      node.beginToken,
+      node,
+      () => super.visitClassMember(node),
+    );
+  }
+
+  @override
+  void visitCompilationUnitMember(CompilationUnitMember node) {
+    _indentAtToken(
+      node.beginToken,
+      node,
+      () => super.visitCompilationUnitMember(node),
+    );
+  }
+
+  @override
   void visitCompilationUnit(CompilationUnit node) {
     locationHelper = LocationHelper(node.lineInfo);
     super.visitCompilationUnit(node);
@@ -138,6 +156,12 @@ class _Visitor extends GeneralizingAstVisitor<void> {
         super.visitListLiteral(node);
       },
     );
+  }
+
+  @override
+  void visitFormalParameter(FormalParameter node) {
+    _checkIndent(node);
+    super.visitFormalParameter(node);
   }
 
   @override
